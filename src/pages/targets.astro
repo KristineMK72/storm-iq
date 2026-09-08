@@ -1,0 +1,38 @@
+---
+import Layout from "../layouts/Layout.astro";
+import HomeBase from "../components/HomeBase";
+import TargetBoard from "../components/TargetBoard";
+import ChaseScore from "../components/ChaseScore";
+import LookingAhead from "../components/LookingAhead";
+---
+
+<Layout title="Storm IQ | Targets">
+
+  <div class="page-head">
+
+    <div class="eyebrow">
+      Chase targeting
+    </div>
+
+    <h1>
+      TARGETS
+    </h1>
+
+    <p>
+      Ranked live threats across the contiguous U.S.,
+      with optional drive-time estimates from your home base.
+      Official NWS warnings always take priority.
+    </p>
+
+  </div>
+
+  <HomeBase client:only="react" />
+
+  <div class="grid dashboard-grid">
+    <ChaseScore client:only="react" />
+    <TargetBoard client:only="react" />
+  </div>
+
+  <LookingAhead client:only="react" />
+
+</Layout>

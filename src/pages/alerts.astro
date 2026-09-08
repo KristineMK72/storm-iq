@@ -1,20 +1,6 @@
 ---
 import Layout from "../layouts/Layout.astro";
-import { fetchActiveAlerts } from "../lib/nws/alerts";
-
-let alerts = [];
-let error = "";
-
-try {
-
-  alerts = await fetchActiveAlerts();
-
-} catch (err) {
-
-  error =
-    "Live NWS alerts could not be loaded during this request.";
-
-}
+import AlertsList from "../components/AlertsList";
 ---
 
 <Layout title="Storm IQ | Alerts">
@@ -30,75 +16,12 @@ try {
     </h1>
 
     <p>
-      Storm IQ surfaces official National
-      Weather Service alerts so they can
-      override chase recommendations when
-      safety requires it.
+      Live National Weather Service alerts so they can
+      override chase recommendations when safety requires it.
     </p>
 
   </div>
 
-
-  {error && (
-
-    <div class="notice">
-      {error}
-    </div>
-
-  )}
-
-
-  <div class="card">
-
-    <div class="section-title">
-
-      <h2>
-        National NWS alerts
-      </h2>
-
-      <span class="small muted">
-        {alerts.length} loaded
-      </span>
-
-    </div>
-
-
-    {alerts.length === 0 && !error && (
-
-      <p class="muted">
-        No active alerts returned at the moment.
-      </p>
-
-    )}
-
-
-    {alerts.slice(0, 30).map((alert) => (
-
-      <div class="alert">
-
-        <strong>
-          {alert.event}
-        </strong>
-
-        <p>
-          {
-            alert.headline ??
-            alert.areaDesc ??
-            "Active National Weather Service alert."
-          }
-        </p>
-
-        <div
-          class="small muted"
-          style="margin-top:7px"
-        >
-          {alert.areaDesc ?? ""}
-        </div>
-
-      </div>
-
-    ))}
-
-  </div>
+  <AlertsList client:only="react" />
 
 </Layout>
