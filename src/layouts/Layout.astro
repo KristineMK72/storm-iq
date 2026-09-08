@@ -1,0 +1,62 @@
+---
+import "../styles/global.css";
+
+const {
+  title = "Storm IQ",
+  description = "Real-time storm intelligence for safer storm observation."
+} = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <meta name="theme-color" content="#05090b" />
+    <meta name="description" content={description} />
+
+    <title>{title}</title>
+  </head>
+
+  <body>
+    <div class="app-shell">
+
+      <header class="topbar">
+
+        <a href="/" class="brand">
+          <span class="brand-mark">⚡</span>
+          <span>
+            STORM <strong>IQ</strong>
+          </span>
+        </a>
+
+        <nav>
+          <a href="/">Command</a>
+          <a href="/map">Map</a>
+          <a href="/targets">Targets</a>
+          <a href="/alerts">Alerts</a>
+        </nav>
+
+        <div class="live-pill">
+          <span></span>
+          LIVE
+        </div>
+
+      </header>
+
+      <main>
+        <slot />
+      </main>
+
+      <footer>
+        <span>STORM IQ</span>
+
+        <span>
+          Official weather guidance always takes priority.
+        </span>
+      </footer>
+
+    </div>
+  </body>
+</html>
