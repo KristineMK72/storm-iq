@@ -1,0 +1,54 @@
+---
+import Layout from "../layouts/Layout.astro";
+import StormMap from "../components/StormMap";
+---
+
+<Layout title="Storm IQ | Map">
+
+  <div class="page-head">
+
+    <div class="eyebrow">
+      National operations map
+    </div>
+
+    <h1>
+      STORM MAP
+    </h1>
+
+    <p>
+      Live radar, SPC outlook polygons,
+      storm cells, warnings and safe
+      observation layers will converge here.
+    </p>
+
+  </div>
+
+
+  <div class="card">
+
+    <div class="map-shell">
+
+      <StormMap client:load />
+
+    </div>
+
+  </div>
+
+
+  <div
+    class="notice"
+    style="margin-top:18px"
+  >
+
+    <strong>
+      BUILD NOTE:
+    </strong>
+
+    This map currently uses demonstration
+    target markers. The next data layer is
+    the official NOAA/SPC outlook service,
+    followed by radar/MRMS storm-cell data.
+
+  </div>
+
+</Layout>
