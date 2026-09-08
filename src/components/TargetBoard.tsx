@@ -8,21 +8,24 @@ type BoardItem = {
   event: string;
 };
 
-function scoreFromAlert(event: string, severity?: string): number {
+function scoreFromAlert(event: string, severity?: string, urgency?: string): number {
   const e = (event || "").toLowerCase();
   const s = (severity || "").toLowerCase();
+  const u = (urgency || "").toLowerCase();
 
-  let base = 50;
-  if (s === "extreme") base = 94;
-  else if (s === "severe") base = 86;
-  else if (s === "moderate") base = 72;
+  let base = 45;
+  if (s === "extreme") base = 92;
+  else if (s === "severe") base = 84;
+  else if (s === "moderate") base = 70;
   else if (s === "minor") base = 58;
 
-  if (e.includes("tornado")) base = Math.min(99, base + 8);
-  else if (e.includes("severe thunderstorm")) base = Math.min(95, base + 4);
-  else if (e.includes("flash flood")) base = Math.min(92, base + 2);
+  if (e.includes("tornado")) base = Math.min(99, base + 10);
+  else if (e.includes("severe thunderstorm")) base = Math.min(96, base + 6);
+  else if (e.includes("flash flood")) base = Math.min(93, base + 4);
 
-  return base;
+  if (u === "immediate") base = Math.min(99, base + 3);
+
+  return Math.round(base);
 }
 
 function shortArea(areaDesc?: string): string {
@@ -33,7 +36,6 @@ function shortArea(areaDesc?: string): string {
 
 function guessState(areaDesc?: string): string {
   if (!areaDesc) return "—";
-  // Very rough extraction of state abbreviation if present
   const match = areaDesc.match(/\b([A-Z]{2})\b/);
   return match ? match[1] : "US";
 }
@@ -55,22 +57,20 @@ export default function TargetBoard() {
 
         const data = await res.json();
         const features = data?.features ?? [];
-
         const scored: BoardItem[] = [];
 
         for (const f of features) {
           const p = f.properties ?? {};
+          if ((p.event || "").toLowerCase().includes("test") || p.status === "Test") continue;
+
           const event = p.event || "Weather Alert";
           const severity = p.severity || "Unknown";
-          const score = scoreFromAlert(event, severity);
+          const score = scoreFromAlert(event, severity, p.urgency);
+          if (score < 62) continue;
 
-          // Only keep meaningful alerts
-          if (score < 60) continue;
-
-          let statusLabel = "WATCH";
+          let statusLabel = "ACTIVE";
           if (severity === "Extreme" || severity === "Severe") statusLabel = "WARNING";
           else if (event.toLowerCase().includes("watch")) statusLabel = "WATCH";
-          else statusLabel = "ACTIVE";
 
           scored.push({
             name: shortArea(p.areaDesc),
@@ -81,13 +81,12 @@ export default function TargetBoard() {
           });
         }
 
-        // Sort by score descending and take unique-ish top 5
         scored.sort((a, b) => b.score - a.score);
 
         const unique: BoardItem[] = [];
         const seen = new Set<string>();
         for (const item of scored) {
-          const key = item.name.slice(0, 20);
+          const key = item.name.slice(0, 18);
           if (seen.has(key)) continue;
           seen.add(key);
           unique.push(item);
@@ -121,29 +120,22 @@ export default function TargetBoard() {
 
       {(status === "empty" || status === "error") && (
         <p className="muted" style={{ marginTop: 12 }}>
-          No high-impact alerts at the moment.
+          No high-impact alerts at the moment. Check the map for SPC outlook.
         </p>
       )}
 
       {items.map((item, index) => (
         <div className="target-row" key={item.name + index}>
           <div className="rank">0{index + 1}</div>
-
           <div>
             <strong>{item.name}</strong>
             <div className="small muted">
               {item.state} · {item.event}
             </div>
           </div>
-
-          <div
-            className={`badge ${
-              item.status === "WARNING" ? "warn" : ""
-            }`}
-          >
+          <div className={`badge ${item.status === "WARNING" ? "warn" : ""}`}>
             {item.status}
           </div>
-
           <div className="score-num">{item.score}</div>
         </div>
       ))}

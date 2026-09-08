@@ -5,31 +5,39 @@ type LiveTarget = {
   score: number;
   event: string;
   severity: string;
+  urgency?: string;
   area: string;
   headline?: string;
-  expires?: string;
 };
 
-function scoreFromAlert(event: string, severity?: string): number {
+function scoreFromAlert(event: string, severity?: string, urgency?: string): number {
   const e = (event || "").toLowerCase();
   const s = (severity || "").toLowerCase();
+  const u = (urgency || "").toLowerCase();
 
-  let base = 50;
-  if (s === "extreme") base = 94;
-  else if (s === "severe") base = 86;
-  else if (s === "moderate") base = 72;
+  let base = 45;
+
+  // Severity weight
+  if (s === "extreme") base = 92;
+  else if (s === "severe") base = 84;
+  else if (s === "moderate") base = 70;
   else if (s === "minor") base = 58;
 
-  if (e.includes("tornado")) base = Math.min(99, base + 8);
-  else if (e.includes("severe thunderstorm")) base = Math.min(95, base + 4);
-  else if (e.includes("flash flood")) base = Math.min(92, base + 2);
+  // Event type boost
+  if (e.includes("tornado")) base = Math.min(99, base + 10);
+  else if (e.includes("severe thunderstorm")) base = Math.min(96, base + 6);
+  else if (e.includes("flash flood")) base = Math.min(93, base + 4);
+  else if (e.includes("hurricane") || e.includes("tropical")) base = Math.min(95, base + 5);
 
-  return base;
+  // Urgency
+  if (u === "immediate") base = Math.min(99, base + 3);
+  else if (u === "expected") base = Math.min(97, base + 1);
+
+  return Math.round(base);
 }
 
 function shortArea(areaDesc?: string): string {
   if (!areaDesc) return "Multiple areas";
-  // Take first meaningful chunk
   const first = areaDesc.split(";")[0]?.trim() || areaDesc;
   return first.length > 42 ? first.slice(0, 40) + "…" : first;
 }
@@ -57,9 +65,11 @@ export default function ChaseScore() {
 
         for (const f of features) {
           const p = f.properties ?? {};
+          if ((p.event || "").toLowerCase().includes("test") || p.status === "Test") continue;
+
           const event = p.event || "Weather Alert";
           const severity = p.severity || "Unknown";
-          const score = scoreFromAlert(event, severity);
+          const score = scoreFromAlert(event, severity, p.urgency);
 
           if (score > bestScore) {
             bestScore = score;
@@ -68,9 +78,9 @@ export default function ChaseScore() {
               score,
               event,
               severity,
+              urgency: p.urgency,
               area: p.areaDesc || "",
               headline: p.headline,
-              expires: p.expires,
             };
           }
         }
@@ -100,9 +110,9 @@ export default function ChaseScore() {
   if (status === "error" || status === "empty" || !target) {
     return (
       <div className="card target-card">
-        <div className="eyebrow">Primary target</div>
+        <div className="eyebrow">Primary target · LIVE</div>
         <div className="target-name">No high-impact alerts</div>
-        <div className="target-meta">LIVE NWS · All clear or data unavailable</div>
+        <div className="target-meta">All clear or data unavailable · check SPC outlook</div>
         <div className="score-wrap">
           <div className="score">
             <b>—</b>
@@ -114,10 +124,10 @@ export default function ChaseScore() {
   }
 
   const metrics = [
-    ["Severity", target.severity === "Extreme" ? 98 : target.severity === "Severe" ? 88 : 70],
-    ["Event type", target.event.toLowerCase().includes("tornado") ? 95 : 78],
-    ["Urgency", 82],
-    ["Coverage", 75],
+    ["Severity", target.severity === "Extreme" ? 98 : target.severity === "Severe" ? 88 : 68],
+    ["Event type", target.event.toLowerCase().includes("tornado") ? 96 : 78],
+    ["Urgency", target.urgency === "Immediate" ? 92 : 75],
+    ["Coverage", 72],
   ];
 
   return (
@@ -151,19 +161,21 @@ export default function ChaseScore() {
       <div className="kpis" style={{ marginTop: 22 }}>
         <div className="kpi">
           <span>Event</span>
-          <b style={{ fontSize: 16 }}>{target.event.replace(" Warning", "").replace(" Watch", "")}</b>
+          <b style={{ fontSize: 15 }}>
+            {target.event.replace(" Warning", "").replace(" Watch", "")}
+          </b>
         </div>
         <div className="kpi">
           <span>Severity</span>
-          <b style={{ fontSize: 16 }}>{target.severity}</b>
+          <b style={{ fontSize: 15 }}>{target.severity}</b>
         </div>
         <div className="kpi">
-          <span>Status</span>
-          <b style={{ fontSize: 16 }}>ACTIVE</b>
+          <span>Urgency</span>
+          <b style={{ fontSize: 15 }}>{target.urgency || "—"}</b>
         </div>
         <div className="kpi">
           <span>Source</span>
-          <b style={{ fontSize: 16 }}>NWS</b>
+          <b style={{ fontSize: 15 }}>NWS</b>
         </div>
       </div>
     </div>

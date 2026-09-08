@@ -3,6 +3,7 @@ import Layout from "../layouts/Layout.astro";
 import ChaseScore from "../components/ChaseScore";
 import TargetBoard from "../components/TargetBoard";
 import StormMap from "../components/StormMap";
+import ModelGuidance from "../components/ModelGuidance";
 ---
 
 <Layout title="Storm IQ | Command">
@@ -116,80 +117,7 @@ import StormMap from "../components/StormMap";
     </div>
 
 
-    <div class="card">
-
-      <div class="section-title">
-
-        <div>
-
-          <div class="eyebrow">
-            Decision support
-          </div>
-
-          <h2>
-            What’s live now
-          </h2>
-
-        </div>
-
-      </div>
-
-
-      <div class="alert">
-
-        <strong>
-          SPC Day 1 outlook
-        </strong>
-
-        <p>
-          Categorical risk areas plus tornado and
-          hail probability contours are plotted
-          on the map.
-        </p>
-
-      </div>
-
-
-      <div class="alert">
-
-        <strong>
-          Live radar + alerts
-        </strong>
-
-        <p>
-          National NEXRAD reflectivity and active
-          NWS warnings/watches update on load.
-        </p>
-
-      </div>
-
-
-      <div class="alert">
-
-        <strong>
-          Safety override
-        </strong>
-
-        <p>
-          Official warnings always take priority.
-          Never use this dashboard in place of
-          NWS warnings or local emergency guidance.
-        </p>
-
-      </div>
-
-
-      <p
-        class="small muted"
-        style="margin-top:18px"
-      >
-        Next up: model parameters (CAPE, shear)
-        and travel-time scoring. Current scores
-        are derived from live alert severity +
-        SPC risk.
-      </p>
-
-    </div>
+    <ModelGuidance client:only="react" />
 
   </div>
 
