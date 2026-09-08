@@ -71,6 +71,43 @@ function getCentroid(geometry: any): [number, number] | null {
   return n ? [lat / n, lng / n] : null;
 }
 
+/** Contiguous US rough bounds (excludes HI, AK, territories) */
+function isContiguousUS(lat?: number, lng?: number, areaDesc?: string, event?: string): boolean {
+  const e = (event || "").toLowerCase();
+  const a = (areaDesc || "").toLowerCase();
+
+  // Explicit exclusions
+  if (
+    a.includes("hawaii") ||
+    a.includes("kauai") ||
+    a.includes("oahu") ||
+    a.includes("maui") ||
+    a.includes("honolulu") ||
+    a.includes("alaska") ||
+    a.includes("puerto rico") ||
+    a.includes("guam") ||
+    a.includes("american samoa") ||
+    a.includes("virgin islands") ||
+    /\bhi\b/.test(a) ||
+    /\bak\b/.test(a)
+  ) {
+    return false;
+  }
+
+  // Pure tropical products outside CONUS often dominate — keep only if lat/lng is CONUS
+  if (lat != null && lng != null) {
+    // Contiguous US approximate box
+    if (lat < 24.5 || lat > 49.5 || lng < -125 || lng > -66.5) return false;
+  }
+
+  // If no geometry, still allow CONUS-sounding severe (not hurricane/tropical alone)
+  if (lat == null && (e.includes("hurricane") || e.includes("tropical"))) {
+    return false;
+  }
+
+  return true;
+}
+
 export default function TargetBoard() {
   const [items, setItems] = useState<BoardItem[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "empty" | "error">("loading");
@@ -111,15 +148,18 @@ export default function TargetBoard() {
           const event = p.event || "Weather Alert";
           const severity = p.severity || "Unknown";
           const score = scoreFromAlert(event, severity, p.urgency);
-
-          // Lower threshold so quiet days still show something
           if (score < 55) continue;
+
+          const center = getCentroid(f.geometry);
+          const lat = center?.[0];
+          const lng = center?.[1];
+
+          // Chase-focused: contiguous US only
+          if (!isContiguousUS(lat, lng, p.areaDesc, event)) continue;
 
           let statusLabel = "ACTIVE";
           if (severity === "Extreme" || severity === "Severe") statusLabel = "WARNING";
           else if (event.toLowerCase().includes("watch")) statusLabel = "WATCH";
-
-          const center = getCentroid(f.geometry);
 
           scored.push({
             name: shortArea(p.areaDesc),
@@ -127,8 +167,8 @@ export default function TargetBoard() {
             status: statusLabel,
             state: guessState(p.areaDesc),
             event,
-            lat: center?.[0],
-            lng: center?.[1],
+            lat,
+            lng,
           });
         }
 
@@ -146,7 +186,6 @@ export default function TargetBoard() {
 
         if (cancelled) return;
 
-        // Compute ETAs when home is set
         const currentHome = loadHomeBase();
         if (currentHome && unique.length) {
           setEtaStatus("calc");
@@ -213,7 +252,7 @@ export default function TargetBoard() {
 
       {(status === "empty" || status === "error") && (
         <p className="muted" style={{ marginTop: 12 }}>
-          No ranked alerts right now. Check the map for SPC outlook & radar.
+          No ranked CONUS alerts right now. Check the map for SPC outlook & radar.
         </p>
       )}
 
@@ -226,7 +265,8 @@ export default function TargetBoard() {
               {item.state} · {item.event}
               {item.etaMin != null ? (
                 <>
-                  {" "}· <span style={{ color: "var(--lime)" }}>~{formatDuration(item.etaMin)}</span>
+                  {" "}·{" "}
+                  <span style={{ color: "var(--lime)" }}>~{formatDuration(item.etaMin)}</span>
                   {" "}· {item.etaMiles} mi
                 </>
               ) : home && item.lat == null ? (
@@ -243,7 +283,7 @@ export default function TargetBoard() {
 
       {home && etaStatus === "done" && items.some((i) => i.etaMin != null) && (
         <p className="small muted" style={{ marginTop: 10 }}>
-          ETAs are approximate drive times from your home base.
+          ETAs are approximate drive times from your home base (contiguous US).
         </p>
       )}
     </div>
