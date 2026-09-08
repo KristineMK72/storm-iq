@@ -76,7 +76,12 @@ export default function StormMap() {
     ).addTo(map);
 
     mapInstance.current = map;
-    setTimeout(() => map.invalidateSize(), 200);
+
+    // Critical: force Leaflet to recalculate size after the container is visible
+    const resize = () => map.invalidateSize();
+    setTimeout(resize, 100);
+    setTimeout(resize, 400);
+    window.addEventListener("resize", resize);
 
     async function loadLayers() {
       let outlookCount = 0;
@@ -103,7 +108,7 @@ export default function StormMap() {
                 color: color,
                 weight: 2,
                 fillColor: color,
-                fillOpacity: label === "TSTM" ? 0.12 : 0.28,
+                fillOpacity: label === "TSTM" ? 0.15 : 0.32,
               },
             }).addTo(map);
 
@@ -125,7 +130,7 @@ export default function StormMap() {
         console.warn("SPC outlook failed", e);
       }
 
-      // ── 2. Live NWS Alerts (more permissive) ───────────────────────
+      // ── 2. Live NWS Alerts ─────────────────────────────────────────
       try {
         const res = await fetch("https://api.weather.gov/alerts/active", {
           headers: {
@@ -142,10 +147,8 @@ export default function StormMap() {
             const props = f.properties || {};
             const event = (props.event || "").toLowerCase();
 
-            // Skip pure test / keepalive messages
             if (event.includes("test") || props.status === "Test") continue;
 
-            // Prefer warnings & watches, but accept most meteorological alerts
             const interesting =
               event.includes("warning") ||
               event.includes("watch") ||
@@ -201,14 +204,13 @@ export default function StormMap() {
             );
 
             alertCount++;
-            if (alertCount >= 200) break; // keep map readable
+            if (alertCount >= 200) break;
           }
         }
       } catch (e) {
         console.warn("NWS alerts failed", e);
       }
 
-      // Status badge
       if (outlookCount || alertCount) {
         setStatus(
           `LIVE · ${outlookCount} outlook area${outlookCount !== 1 ? "s" : ""}` +
@@ -217,19 +219,40 @@ export default function StormMap() {
       } else {
         setStatus("No active outlook or alerts right now");
       }
+
+      // One more size fix after layers load
+      setTimeout(() => map.invalidateSize(), 100);
     }
 
     loadLayers();
 
     return () => {
+      window.removeEventListener("resize", resize);
       map.remove();
       mapInstance.current = null;
     };
   }, []);
 
   return (
-    <div style={{ position: "relative", width: "100%", height: "100%" }}>
-      <div id="storm-map" ref={mapRef} style={{ width: "100%", height: "100%" }} />
+    <div
+      style={{
+        position: "relative",
+        width: "100%",
+        height: 420,
+        minHeight: 420,
+      }}
+    >
+      <div
+        id="storm-map"
+        ref={mapRef}
+        style={{
+          width: "100%",
+          height: "100%",
+          minHeight: 420,
+          borderRadius: 14,
+          background: "#071014",
+        }}
+      />
 
       <div
         style={{
@@ -251,7 +274,6 @@ export default function StormMap() {
         {status}
       </div>
 
-      {/* Legend */}
       <div
         style={{
           position: "absolute",
@@ -267,7 +289,9 @@ export default function StormMap() {
           lineHeight: 1.5,
         }}
       >
-        <div style={{ fontWeight: 700, marginBottom: 4, color: "#edf8f7" }}>SPC Day 1 Risk</div>
+        <div style={{ fontWeight: 700, marginBottom: 4, color: "#edf8f7" }}>
+          SPC Day 1 Risk
+        </div>
         <div><span style={{ color: "#66cc66" }}>■</span> Marginal</div>
         <div><span style={{ color: "#ffe066" }}>■</span> Slight</div>
         <div><span style={{ color: "#ff9933" }}>■</span> Enhanced</div>
