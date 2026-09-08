@@ -8,6 +8,12 @@ const {
 
 const site = "https://storm-iq.vercel.app";
 const ogImage = `${site}/og.svg`;
+const path = Astro.url.pathname;
+
+function isActive(href: string) {
+  if (href === "/") return path === "/" || path === "";
+  return path === href || path.startsWith(href + "/");
+}
 ---
 
 <!doctype html>
@@ -19,7 +25,6 @@ const ogImage = `${site}/og.svg`;
     <meta name="theme-color" content="#05090b" />
     <meta name="description" content={description} />
 
-    <!-- Open Graph -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Storm IQ" />
     <meta property="og:title" content={title} />
@@ -29,7 +34,6 @@ const ogImage = `${site}/og.svg`;
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
 
-    <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
@@ -52,11 +56,11 @@ const ogImage = `${site}/og.svg`;
           </span>
         </a>
 
-        <nav>
-          <a href="/">Command</a>
-          <a href="/map">Map</a>
-          <a href="/targets">Targets</a>
-          <a href="/alerts">Alerts</a>
+        <nav class="desktop-nav">
+          <a href="/" class={isActive("/") ? "nav-active" : ""}>Command</a>
+          <a href="/map" class={isActive("/map") ? "nav-active" : ""}>Map</a>
+          <a href="/targets" class={isActive("/targets") ? "nav-active" : ""}>Targets</a>
+          <a href="/alerts" class={isActive("/alerts") ? "nav-active" : ""}>Alerts</a>
         </nav>
 
         <div class="live-pill">
@@ -64,7 +68,24 @@ const ogImage = `${site}/og.svg`;
           LIVE
         </div>
 
+        <button
+          class="menu-btn"
+          type="button"
+          aria-label="Open menu"
+          aria-expanded="false"
+          id="menu-btn"
+        >
+          <span></span><span></span><span></span>
+        </button>
+
       </header>
+
+      <div class="mobile-nav" id="mobile-nav" hidden>
+        <a href="/" class={isActive("/") ? "nav-active" : ""}>Command</a>
+        <a href="/map" class={isActive("/map") ? "nav-active" : ""}>Map</a>
+        <a href="/targets" class={isActive("/targets") ? "nav-active" : ""}>Targets</a>
+        <a href="/alerts" class={isActive("/alerts") ? "nav-active" : ""}>Alerts</a>
+      </div>
 
       <main>
         <slot />
@@ -72,12 +93,29 @@ const ogImage = `${site}/og.svg`;
 
       <footer>
         <span>STORM IQ</span>
-
-        <span>
-          Official weather guidance always takes priority.
-        </span>
+        <span>Official weather guidance always takes priority.</span>
       </footer>
 
     </div>
+
+    <script is:inline>
+      (function () {
+        var btn = document.getElementById("menu-btn");
+        var panel = document.getElementById("mobile-nav");
+        if (!btn || !panel) return;
+        btn.addEventListener("click", function () {
+          var open = panel.hasAttribute("hidden");
+          if (open) {
+            panel.removeAttribute("hidden");
+            btn.setAttribute("aria-expanded", "true");
+            btn.classList.add("open");
+          } else {
+            panel.setAttribute("hidden", "");
+            btn.setAttribute("aria-expanded", "false");
+            btn.classList.remove("open");
+          }
+        });
+      })();
+    </script>
   </body>
 </html>
