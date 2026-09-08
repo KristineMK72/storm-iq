@@ -17,16 +17,24 @@ export default function StormMap() {
   useEffect(() => {
     if (!mapRef.current || mapInstance.current) return;
 
+    // Centered on the contiguous United States
     const map = L.map(mapRef.current, {
-      center: [42.5, -97.5],
-      zoom: 6,
+      center: [39.8, -98.5],
+      zoom: 4,
       zoomControl: true,
+      minZoom: 3,
+      maxZoom: 12,
     });
 
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
-      maxZoom: 19,
-    }).addTo(map);
+    // Free Esri dark gray basemap (no API key required)
+    L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+      {
+        attribution:
+          "Tiles &copy; Esri &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap contributors, and the GIS user community",
+        maxZoom: 16,
+      }
+    ).addTo(map);
 
     demoTargets.forEach((t) => {
       const marker = L.circleMarker([t.lat, t.lng], {
@@ -45,7 +53,7 @@ export default function StormMap() {
     mapInstance.current = map;
 
     // Fix size after the container becomes visible
-    setTimeout(() => map.invalidateSize(), 100);
+    setTimeout(() => map.invalidateSize(), 150);
 
     return () => {
       map.remove();
