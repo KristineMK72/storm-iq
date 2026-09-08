@@ -1,6 +1,7 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import StormMap from "../components/StormMap";
+import OutlookDiscussion from "../components/OutlookDiscussion";
 ---
 
 <Layout title="Storm IQ | Map">
@@ -18,7 +19,7 @@ import StormMap from "../components/StormMap";
     <p>
       Live National Weather Service alerts plus the
       official SPC Day 1 convective outlook (look-ahead
-      risk areas). Click any polygon or marker for details.
+      risk areas). Scroll down for the full written discussion.
     </p>
 
   </div>
@@ -35,6 +36,9 @@ import StormMap from "../components/StormMap";
   </div>
 
 
+  <OutlookDiscussion client:only="react" />
+
+
   <div
     class="notice"
     style="margin-top:18px"
@@ -46,8 +50,9 @@ import StormMap from "../components/StormMap";
 
     Colored regions = SPC Day 1 categorical outlook
     (Marginal → High risk). Dots = active NWS alerts.
-    Click anything for full details. Official NWS
-    warnings always take priority.
+    The discussion below is the official SPC text
+    explaining the expected threats and timing.
+    Official NWS warnings always take priority.
 
   </div>
 
