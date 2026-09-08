@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-// SPC categorical colors (approximate official)
 const SPC_COLORS: Record<string, string> = {
   TSTM: "#c1c1c1",
   MRGL: "#66cc66",
@@ -12,24 +11,25 @@ const SPC_COLORS: Record<string, string> = {
   HIGH: "#cc33ff",
 };
 
+// Approximate colors for probability contours
+const PROB_COLORS: Record<string, string> = {
+  "2": "#00bb00",
+  "5": "#8bce00",
+  "10": "#ffcc00",
+  "15": "#ff9900",
+  "30": "#ff0000",
+  "45": "#ff00ff",
+  "60": "#912cee",
+};
+
 function getCentroid(geometry: any): [number, number] | null {
   if (!geometry) return null;
-
   let coords: number[][] = [];
-
-  if (geometry.type === "Point") {
-    return [geometry.coordinates[1], geometry.coordinates[0]];
-  }
-  if (geometry.type === "Polygon") {
-    coords = geometry.coordinates[0] || [];
-  } else if (geometry.type === "MultiPolygon") {
-    coords = geometry.coordinates?.[0]?.[0] || [];
-  } else {
-    return null;
-  }
-
+  if (geometry.type === "Point") return [geometry.coordinates[1], geometry.coordinates[0]];
+  if (geometry.type === "Polygon") coords = geometry.coordinates[0] || [];
+  else if (geometry.type === "MultiPolygon") coords = geometry.coordinates?.[0]?.[0] || [];
+  else return null;
   if (!coords.length) return null;
-
   let lat = 0, lng = 0, n = 0;
   for (const c of coords) {
     if (Array.isArray(c) && c.length >= 2) {
@@ -54,8 +54,13 @@ export default function StormMap() {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<L.Map | null>(null);
   const radarLayerRef = useRef<L.TileLayer | null>(null);
-  const [status, setStatus] = useState("Loading outlook & alerts…");
+  const [status, setStatus] = useState("Loading layers…");
   const [radarOn, setRadarOn] = useState(true);
+  const [showTorn, setShowTorn] = useState(true);
+  const [showHail, setShowHail] = useState(false);
+
+  const tornLayerRef = useRef<L.LayerGroup | null>(null);
+  const hailLayerRef = useRef<L.LayerGroup | null>(null);
 
   useEffect(() => {
     if (!mapRef.current || mapInstance.current) return;
@@ -71,24 +76,26 @@ export default function StormMap() {
     L.tileLayer(
       "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
       {
-        attribution:
-          "Tiles © Esri — Esri, HERE, Garmin, © OpenStreetMap contributors",
+        attribution: "Tiles © Esri — Esri, HERE, Garmin, © OpenStreetMap",
         maxZoom: 16,
       }
     ).addTo(map);
 
-    // Live NEXRAD base reflectivity (Iowa State Mesonet – free NWS data)
+    // Radar
     const radar = L.tileLayer(
       "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png",
       {
         attribution: "Radar © Iowa State Mesonet / NWS NEXRAD",
-        opacity: 0.65,
+        opacity: 0.6,
         zIndex: 200,
         maxZoom: 12,
       }
     );
     radar.addTo(map);
     radarLayerRef.current = radar;
+
+    tornLayerRef.current = L.layerGroup().addTo(map);
+    hailLayerRef.current = L.layerGroup();
 
     mapInstance.current = map;
 
@@ -101,138 +108,151 @@ export default function StormMap() {
       let outlookCount = 0;
       let alertCount = 0;
 
-      // ── 1. SPC Day 1 Categorical Outlook ───────────────────────────
+      // Categorical Day 1
       try {
         const res = await fetch(
           "https://www.spc.noaa.gov/products/outlook/day1otlk_cat.nolyr.geojson",
-          { headers: { "User-Agent": "StormIQ (https://storm-iq.vercel.app)" } }
+          { headers: { "User-Agent": "StormIQ" } }
         );
         if (res.ok) {
           const geo = await res.json();
-          const features = geo?.features || [];
-
-          features.forEach((f: any) => {
+          (geo?.features || []).forEach((f: any) => {
             const label = (f.properties?.LABEL || f.properties?.label || "TSTM").toUpperCase();
             const color = SPC_COLORS[label] || "#888";
-
             if (!f.geometry) return;
-
-            const layer = L.geoJSON(f, {
+            L.geoJSON(f, {
               style: {
-                color: color,
+                color,
                 weight: 2,
                 fillColor: color,
-                fillOpacity: label === "TSTM" ? 0.12 : 0.28,
+                fillOpacity: label === "TSTM" ? 0.1 : 0.25,
               },
-            }).addTo(map);
-
-            layer.bindPopup(
-              `<div style="font-family:system-ui;min-width:180px">
-                <strong style="font-size:14px">SPC Day 1 · ${label}</strong><br/>
-                <span style="font-size:12px;color:#333">
-                  Categorical convective outlook risk area.
-                </span><br/>
-                <a href="https://www.spc.noaa.gov/products/outlook/" target="_blank" rel="noopener"
-                   style="font-size:11px;color:#0a7">Full SPC outlook →</a>
-              </div>`
-            );
-
+            })
+              .bindPopup(
+                `<strong>SPC Day 1 · ${label}</strong><br/>Categorical risk area.`
+              )
+              .addTo(map);
             outlookCount++;
           });
         }
       } catch (e) {
-        console.warn("SPC outlook failed", e);
+        console.warn("SPC cat failed", e);
       }
 
-      // ── 2. Live NWS Alerts ─────────────────────────────────────────
+      // Tornado probabilities
+      try {
+        const res = await fetch(
+          "https://www.spc.noaa.gov/products/outlook/day1otlk_torn.nolyr.geojson",
+          { headers: { "User-Agent": "StormIQ" } }
+        );
+        if (res.ok) {
+          const geo = await res.json();
+          (geo?.features || []).forEach((f: any) => {
+            const label = String(f.properties?.LABEL || f.properties?.label || "");
+            const color = PROB_COLORS[label] || "#00aa00";
+            if (!f.geometry) return;
+            L.geoJSON(f, {
+              style: {
+                color,
+                weight: 1.5,
+                fillColor: color,
+                fillOpacity: 0.2,
+                dashArray: "4 3",
+              },
+            })
+              .bindPopup(`<strong>Tornado probability · ${label}%</strong>`)
+              .addTo(tornLayerRef.current!);
+          });
+        }
+      } catch (e) {
+        console.warn("SPC torn failed", e);
+      }
+
+      // Hail probabilities
+      try {
+        const res = await fetch(
+          "https://www.spc.noaa.gov/products/outlook/day1otlk_hail.nolyr.geojson",
+          { headers: { "User-Agent": "StormIQ" } }
+        );
+        if (res.ok) {
+          const geo = await res.json();
+          (geo?.features || []).forEach((f: any) => {
+            const label = String(f.properties?.LABEL || f.properties?.label || "");
+            const color = PROB_COLORS[label] || "#00aa00";
+            if (!f.geometry) return;
+            L.geoJSON(f, {
+              style: {
+                color,
+                weight: 1.5,
+                fillColor: color,
+                fillOpacity: 0.18,
+                dashArray: "2 4",
+              },
+            })
+              .bindPopup(`<strong>Hail probability · ${label}%</strong>`)
+              .addTo(hailLayerRef.current!);
+          });
+        }
+      } catch (e) {
+        console.warn("SPC hail failed", e);
+      }
+
+      // Live alerts
       try {
         const res = await fetch("https://api.weather.gov/alerts/active", {
           headers: {
-            "User-Agent": "StormIQ (https://storm-iq.vercel.app)",
+            "User-Agent": "StormIQ",
             Accept: "application/geo+json",
           },
         });
-
         if (res.ok) {
           const data = await res.json();
-          const features = data?.features || [];
-
-          for (const f of features) {
+          for (const f of data?.features || []) {
             const props = f.properties || {};
             const event = (props.event || "").toLowerCase();
-
             if (event.includes("test") || props.status === "Test") continue;
 
             const interesting =
               event.includes("warning") ||
               event.includes("watch") ||
-              event.includes("advisory") ||
               event.includes("tornado") ||
               event.includes("thunderstorm") ||
               event.includes("flood") ||
               event.includes("hurricane") ||
               event.includes("tropical") ||
-              event.includes("blizzard") ||
               event.includes("winter") ||
-              event.includes("wind") ||
-              event.includes("heat") ||
-              event.includes("fire");
+              event.includes("wind");
 
             if (!interesting) continue;
-
             const center = getCentroid(f.geometry);
             if (!center) continue;
 
             const color = severityColor(props.severity);
-            const marker = L.circleMarker(center, {
+            L.circleMarker(center, {
               radius: 7,
               color,
               fillColor: color,
               fillOpacity: 0.9,
               weight: 2,
-            }).addTo(map);
-
-            const expires = props.expires
-              ? new Date(props.expires).toLocaleString()
-              : "—";
-
-            marker.bindPopup(
-              `<div style="min-width:220px;font-family:system-ui;line-height:1.4">
-                <div style="font-weight:700;font-size:14px;margin-bottom:4px">
-                  ${props.event || "Alert"}
-                </div>
-                <div style="font-size:12px;color:#333;margin-bottom:6px">
-                  ${props.headline || props.areaDesc || "Active NWS alert"}
-                </div>
-                <div style="font-size:11px;color:#555">
-                  <div><b>Severity:</b> ${props.severity || "—"}</div>
-                  <div><b>Urgency:</b> ${props.urgency || "—"}</div>
-                  <div><b>Area:</b> ${props.areaDesc || "—"}</div>
-                  <div><b>Expires:</b> ${expires}</div>
-                </div>
-                <div style="margin-top:8px;font-size:11px">
-                  <a href="/alerts" style="color:#0a7">All live alerts →</a>
-                </div>
-              </div>`,
-              { maxWidth: 280 }
-            );
+            })
+              .bindPopup(
+                `<div style="min-width:200px;font-family:system-ui">
+                  <strong>${props.event || "Alert"}</strong><br/>
+                  <span style="font-size:12px">${props.headline || props.areaDesc || ""}</span><br/>
+                  <span style="font-size:11px">Severity: ${props.severity || "—"}</span>
+                </div>`
+              )
+              .addTo(map);
 
             alertCount++;
-            if (alertCount >= 200) break;
+            if (alertCount >= 180) break;
           }
         }
       } catch (e) {
-        console.warn("NWS alerts failed", e);
+        console.warn("NWS failed", e);
       }
 
-      if (outlookCount || alertCount) {
-        setStatus(
-          `LIVE · ${outlookCount} outlook · ${alertCount} alert${alertCount !== 1 ? "s" : ""}`
-        );
-      } else {
-        setStatus("LIVE · Radar on · No high-impact alerts");
-      }
-
+      setStatus(`LIVE · ${outlookCount} outlook · ${alertCount} alerts`);
       setTimeout(() => map.invalidateSize(), 100);
     }
 
@@ -246,28 +266,41 @@ export default function StormMap() {
     };
   }, []);
 
-  // Toggle radar visibility
+  // Radar toggle
   useEffect(() => {
     const radar = radarLayerRef.current;
     const map = mapInstance.current;
     if (!radar || !map) return;
-
     if (radarOn) {
       if (!map.hasLayer(radar)) radar.addTo(map);
-    } else {
-      if (map.hasLayer(radar)) map.removeLayer(radar);
+    } else if (map.hasLayer(radar)) {
+      map.removeLayer(radar);
     }
   }, [radarOn]);
 
+  // Tornado / Hail layer toggles
+  useEffect(() => {
+    const map = mapInstance.current;
+    if (!map) return;
+    if (showTorn && tornLayerRef.current && !map.hasLayer(tornLayerRef.current)) {
+      tornLayerRef.current.addTo(map);
+    } else if (!showTorn && tornLayerRef.current && map.hasLayer(tornLayerRef.current)) {
+      map.removeLayer(tornLayerRef.current);
+    }
+  }, [showTorn]);
+
+  useEffect(() => {
+    const map = mapInstance.current;
+    if (!map) return;
+    if (showHail && hailLayerRef.current && !map.hasLayer(hailLayerRef.current)) {
+      hailLayerRef.current.addTo(map);
+    } else if (!showHail && hailLayerRef.current && map.hasLayer(hailLayerRef.current)) {
+      map.removeLayer(hailLayerRef.current);
+    }
+  }, [showHail]);
+
   return (
-    <div
-      style={{
-        position: "relative",
-        width: "100%",
-        height: 420,
-        minHeight: 420,
-      }}
-    >
+    <div style={{ position: "relative", width: "100%", height: 420, minHeight: 420 }}>
       <div
         id="storm-map"
         ref={mapRef}
@@ -294,36 +327,42 @@ export default function StormMap() {
           fontSize: 11,
           color: "#d9ff4a",
           fontWeight: 600,
-          letterSpacing: "0.03em",
-          maxWidth: 260,
         }}
       >
         {status}
       </div>
 
-      {/* Radar toggle */}
-      <button
-        onClick={() => setRadarOn((v) => !v)}
+      {/* Layer toggles */}
+      <div
         style={{
           position: "absolute",
           top: 12,
           left: 12,
           zIndex: 1000,
-          background: radarOn ? "rgba(217,255,74,0.18)" : "rgba(5,9,11,0.88)",
-          border: radarOn
-            ? "1px solid rgba(217,255,74,0.5)"
-            : "1px solid rgba(184,221,225,0.22)",
-          borderRadius: 8,
-          padding: "6px 12px",
-          fontSize: 11,
-          color: radarOn ? "#d9ff4a" : "#8fa6a8",
-          fontWeight: 700,
-          letterSpacing: "0.04em",
-          cursor: "pointer",
+          display: "flex",
+          flexDirection: "column",
+          gap: 6,
         }}
       >
-        {radarOn ? "RADAR ON" : "RADAR OFF"}
-      </button>
+        <button
+          onClick={() => setRadarOn((v) => !v)}
+          style={btnStyle(radarOn)}
+        >
+          {radarOn ? "RADAR ON" : "RADAR OFF"}
+        </button>
+        <button
+          onClick={() => setShowTorn((v) => !v)}
+          style={btnStyle(showTorn)}
+        >
+          {showTorn ? "TORNADO ON" : "TORNADO OFF"}
+        </button>
+        <button
+          onClick={() => setShowHail((v) => !v)}
+          style={btnStyle(showHail)}
+        >
+          {showHail ? "HAIL ON" : "HAIL OFF"}
+        </button>
+      </div>
 
       {/* Legend */}
       <div
@@ -341,17 +380,31 @@ export default function StormMap() {
           lineHeight: 1.5,
         }}
       >
-        <div style={{ fontWeight: 700, marginBottom: 4, color: "#edf8f7" }}>
-          Layers
-        </div>
+        <div style={{ fontWeight: 700, marginBottom: 3, color: "#edf8f7" }}>SPC Risk</div>
         <div><span style={{ color: "#66cc66" }}>■</span> Marginal</div>
         <div><span style={{ color: "#ffe066" }}>■</span> Slight</div>
         <div><span style={{ color: "#ff9933" }}>■</span> Enhanced</div>
         <div><span style={{ color: "#ff3333" }}>■</span> Moderate</div>
         <div><span style={{ color: "#cc33ff" }}>■</span> High</div>
-        <div style={{ marginTop: 4, opacity: 0.85 }}>Radar = NEXRAD</div>
-        <div style={{ opacity: 0.85 }}>Dots = NWS alerts</div>
+        <div style={{ marginTop: 4, opacity: 0.85 }}>Radar · Tornado % · Hail %</div>
       </div>
     </div>
   );
+}
+
+function btnStyle(active: boolean): React.CSSProperties {
+  return {
+    background: active ? "rgba(217,255,74,0.18)" : "rgba(5,9,11,0.88)",
+    border: active
+      ? "1px solid rgba(217,255,74,0.5)"
+      : "1px solid rgba(184,221,225,0.22)",
+    borderRadius: 8,
+    padding: "5px 10px",
+    fontSize: 10,
+    color: active ? "#d9ff4a" : "#8fa6a8",
+    fontWeight: 700,
+    letterSpacing: "0.04em",
+    cursor: "pointer",
+    textAlign: "left",
+  };
 }

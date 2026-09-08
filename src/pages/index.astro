@@ -96,13 +96,13 @@ import StormMap from "../components/StormMap";
           </div>
 
           <h2>
-            Live alert map
+            Live operations map
           </h2>
 
         </div>
 
         <span class="small muted">
-          LIVE NWS
+          LIVE NWS + SPC
         </span>
 
       </div>
@@ -127,7 +127,7 @@ import StormMap from "../components/StormMap";
           </div>
 
           <h2>
-            Why this target?
+            What’s live now
           </h2>
 
         </div>
@@ -138,13 +138,27 @@ import StormMap from "../components/StormMap";
       <div class="alert">
 
         <strong>
-          Live threat ranking
+          SPC Day 1 outlook
         </strong>
 
         <p>
-          The primary target and board are ranked
-          from current National Weather Service
-          alerts by severity and event type.
+          Categorical risk areas plus tornado and
+          hail probability contours are plotted
+          on the map.
+        </p>
+
+      </div>
+
+
+      <div class="alert">
+
+        <strong>
+          Live radar + alerts
+        </strong>
+
+        <p>
+          National NEXRAD reflectivity and active
+          NWS warnings/watches update on load.
         </p>
 
       </div>
@@ -165,29 +179,14 @@ import StormMap from "../components/StormMap";
       </div>
 
 
-      <div class="alert">
-
-        <strong>
-          Next layer
-        </strong>
-
-        <p>
-          Future versions will add SPC outlooks,
-          model parameters (CAPE, shear), and
-          timing/travel scoring.
-        </p>
-
-      </div>
-
-
       <p
         class="small muted"
         style="margin-top:18px"
       >
-        Scores are derived from live NWS alert
-        severity. This is operational guidance
-        support, not a replacement for official
-        forecasts.
+        Next up: model parameters (CAPE, shear)
+        and travel-time scoring. Current scores
+        are derived from live alert severity +
+        SPC risk.
       </p>
 
     </div>
