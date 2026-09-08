@@ -2,22 +2,16 @@ import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-type AlertFeature = {
-  id: string;
-  event: string;
-  headline?: string;
-  description?: string;
-  areaDesc?: string;
-  severity?: string;
-  urgency?: string;
-  certainty?: string;
-  effective?: string;
-  expires?: string;
-  lat: number;
-  lng: number;
+// SPC categorical colors (approximate official)
+const SPC_COLORS: Record<string, string> = {
+  TSTM: "#c1c1c1",
+  MRGL: "#66cc66",
+  SLGT: "#ffe066",
+  ENH: "#ff9933",
+  MDT: "#ff3333",
+  HIGH: "#cc33ff",
 };
 
-// Simple centroid for Polygon / MultiPolygon
 function getCentroid(geometry: any): [number, number] | null {
   if (!geometry) return null;
 
@@ -26,59 +20,46 @@ function getCentroid(geometry: any): [number, number] | null {
   if (geometry.type === "Point") {
     return [geometry.coordinates[1], geometry.coordinates[0]];
   }
-
   if (geometry.type === "Polygon") {
-    coords = geometry.coordinates[0];
+    coords = geometry.coordinates[0] || [];
   } else if (geometry.type === "MultiPolygon") {
-    coords = geometry.coordinates[0][0];
+    coords = geometry.coordinates?.[0]?.[0] || [];
   } else {
     return null;
   }
 
-  if (!coords || coords.length === 0) return null;
+  if (!coords.length) return null;
 
-  let latSum = 0;
-  let lngSum = 0;
-  let count = 0;
-
+  let lat = 0, lng = 0, n = 0;
   for (const c of coords) {
     if (Array.isArray(c) && c.length >= 2) {
-      lngSum += c[0];
-      latSum += c[1];
-      count++;
+      lng += c[0];
+      lat += c[1];
+      n++;
     }
   }
-
-  if (count === 0) return null;
-  return [latSum / count, lngSum / count];
+  return n ? [lat / n, lng / n] : null;
 }
 
 function severityColor(severity?: string): string {
-  switch ((severity || "").toLowerCase()) {
-    case "extreme":
-      return "#ff2d2d";
-    case "severe":
-      return "#ff5c5c";
-    case "moderate":
-      return "#ff9f43";
-    case "minor":
-      return "#ffd166";
-    default:
-      return "#52e0d0";
-  }
+  const s = (severity || "").toLowerCase();
+  if (s === "extreme") return "#ff2d2d";
+  if (s === "severe") return "#ff5c5c";
+  if (s === "moderate") return "#ff9f43";
+  if (s === "minor") return "#ffd166";
+  return "#52e0d0";
 }
 
 export default function StormMap() {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<L.Map | null>(null);
-  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [count, setCount] = useState(0);
+  const [status, setStatus] = useState("Loading outlook & alerts…");
 
   useEffect(() => {
     if (!mapRef.current || mapInstance.current) return;
 
     const map = L.map(mapRef.current, {
-      center: [39.8, -98.5],
+      center: [39.5, -98.0],
       zoom: 4,
       zoomControl: true,
       minZoom: 3,
@@ -89,16 +70,62 @@ export default function StormMap() {
       "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
       {
         attribution:
-          "Tiles &copy; Esri &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap contributors, and the GIS user community",
+          "Tiles © Esri — Esri, HERE, Garmin, © OpenStreetMap contributors",
         maxZoom: 16,
       }
     ).addTo(map);
 
     mapInstance.current = map;
-    setTimeout(() => map.invalidateSize(), 150);
+    setTimeout(() => map.invalidateSize(), 200);
 
-    // Fetch live NWS alerts
-    async function loadAlerts() {
+    async function loadLayers() {
+      let outlookCount = 0;
+      let alertCount = 0;
+
+      // ── 1. SPC Day 1 Categorical Outlook (look-ahead) ──────────────
+      try {
+        const res = await fetch(
+          "https://www.spc.noaa.gov/products/outlook/day1otlk_cat.nolyr.geojson",
+          { headers: { "User-Agent": "StormIQ (https://storm-iq.vercel.app)" } }
+        );
+        if (res.ok) {
+          const geo = await res.json();
+          const features = geo?.features || [];
+
+          features.forEach((f: any) => {
+            const label = (f.properties?.LABEL || f.properties?.label || "TSTM").toUpperCase();
+            const color = SPC_COLORS[label] || "#888";
+
+            if (!f.geometry) return;
+
+            const layer = L.geoJSON(f, {
+              style: {
+                color: color,
+                weight: 2,
+                fillColor: color,
+                fillOpacity: label === "TSTM" ? 0.12 : 0.28,
+              },
+            }).addTo(map);
+
+            layer.bindPopup(
+              `<div style="font-family:system-ui;min-width:180px">
+                <strong style="font-size:14px">SPC Day 1 · ${label}</strong><br/>
+                <span style="font-size:12px;color:#333">
+                  Categorical convective outlook risk area.
+                </span><br/>
+                <a href="https://www.spc.noaa.gov/products/outlook/" target="_blank" rel="noopener"
+                   style="font-size:11px;color:#0a7">Full SPC outlook →</a>
+              </div>`
+            );
+
+            outlookCount++;
+          });
+        }
+      } catch (e) {
+        console.warn("SPC outlook failed", e);
+      }
+
+      // ── 2. Live NWS Alerts (more permissive) ───────────────────────
       try {
         const res = await fetch("https://api.weather.gov/alerts/active", {
           headers: {
@@ -107,101 +134,92 @@ export default function StormMap() {
           },
         });
 
-        if (!res.ok) throw new Error(`NWS ${res.status}`);
+        if (res.ok) {
+          const data = await res.json();
+          const features = data?.features || [];
 
-        const data = await res.json();
-        const features = data?.features ?? [];
+          for (const f of features) {
+            const props = f.properties || {};
+            const event = (props.event || "").toLowerCase();
 
-        const alerts: AlertFeature[] = [];
+            // Skip pure test / keepalive messages
+            if (event.includes("test") || props.status === "Test") continue;
 
-        for (const f of features) {
-          const props = f.properties ?? {};
-          const event = (props.event || "").toLowerCase();
+            // Prefer warnings & watches, but accept most meteorological alerts
+            const interesting =
+              event.includes("warning") ||
+              event.includes("watch") ||
+              event.includes("advisory") ||
+              event.includes("tornado") ||
+              event.includes("thunderstorm") ||
+              event.includes("flood") ||
+              event.includes("hurricane") ||
+              event.includes("tropical") ||
+              event.includes("blizzard") ||
+              event.includes("winter") ||
+              event.includes("wind") ||
+              event.includes("heat") ||
+              event.includes("fire");
 
-          // Focus on the most important / actionable alerts
-          const isImportant =
-            event.includes("tornado") ||
-            event.includes("severe thunderstorm") ||
-            event.includes("flash flood") ||
-            event.includes("hurricane") ||
-            event.includes("tropical") ||
-            event.includes("blizzard") ||
-            event.includes("ice storm") ||
-            event.includes("winter storm") ||
-            event.includes("high wind") ||
-            event.includes("warning");
+            if (!interesting) continue;
 
-          if (!isImportant) continue;
+            const center = getCentroid(f.geometry);
+            if (!center) continue;
 
-          const center = getCentroid(f.geometry);
-          if (!center) continue;
+            const color = severityColor(props.severity);
+            const marker = L.circleMarker(center, {
+              radius: 7,
+              color,
+              fillColor: color,
+              fillOpacity: 0.9,
+              weight: 2,
+            }).addTo(map);
 
-          alerts.push({
-            id: f.id || crypto.randomUUID(),
-            event: props.event || "Weather Alert",
-            headline: props.headline,
-            description: props.description,
-            areaDesc: props.areaDesc,
-            severity: props.severity,
-            urgency: props.urgency,
-            certainty: props.certainty,
-            effective: props.effective,
-            expires: props.expires,
-            lat: center[0],
-            lng: center[1],
-          });
+            const expires = props.expires
+              ? new Date(props.expires).toLocaleString()
+              : "—";
+
+            marker.bindPopup(
+              `<div style="min-width:220px;font-family:system-ui;line-height:1.4">
+                <div style="font-weight:700;font-size:14px;margin-bottom:4px">
+                  ${props.event || "Alert"}
+                </div>
+                <div style="font-size:12px;color:#333;margin-bottom:6px">
+                  ${props.headline || props.areaDesc || "Active NWS alert"}
+                </div>
+                <div style="font-size:11px;color:#555">
+                  <div><b>Severity:</b> ${props.severity || "—"}</div>
+                  <div><b>Urgency:</b> ${props.urgency || "—"}</div>
+                  <div><b>Area:</b> ${props.areaDesc || "—"}</div>
+                  <div><b>Expires:</b> ${expires}</div>
+                </div>
+                <div style="margin-top:8px;font-size:11px">
+                  <a href="/alerts" style="color:#0a7">All live alerts →</a>
+                </div>
+              </div>`,
+              { maxWidth: 280 }
+            );
+
+            alertCount++;
+            if (alertCount >= 200) break; // keep map readable
+          }
         }
+      } catch (e) {
+        console.warn("NWS alerts failed", e);
+      }
 
-        // Limit to keep the map readable (most relevant first)
-        const limited = alerts.slice(0, 180);
-
-        limited.forEach((a) => {
-          const color = severityColor(a.severity);
-
-          const marker = L.circleMarker([a.lat, a.lng], {
-            radius: a.severity === "Extreme" || a.severity === "Severe" ? 8 : 6,
-            color,
-            fillColor: color,
-            fillOpacity: 0.85,
-            weight: 2,
-          }).addTo(map);
-
-          const expires = a.expires
-            ? new Date(a.expires).toLocaleString()
-            : "—";
-
-          const popupHtml = `
-            <div style="min-width:220px;font-family:system-ui,sans-serif;line-height:1.4">
-              <div style="font-weight:700;font-size:14px;margin-bottom:4px;color:#111">
-                ${a.event}
-              </div>
-              <div style="font-size:12px;color:#333;margin-bottom:6px">
-                ${a.headline || a.areaDesc || "Active National Weather Service alert"}
-              </div>
-              <div style="font-size:11px;color:#555">
-                <div><b>Severity:</b> ${a.severity || "—"}</div>
-                <div><b>Urgency:</b> ${a.urgency || "—"}</div>
-                <div><b>Area:</b> ${a.areaDesc || "—"}</div>
-                <div><b>Expires:</b> ${expires}</div>
-              </div>
-              <div style="margin-top:8px;font-size:11px">
-                <a href="/alerts" style="color:#0a7">View all live alerts →</a>
-              </div>
-            </div>
-          `;
-
-          marker.bindPopup(popupHtml, { maxWidth: 280 });
-        });
-
-        setCount(limited.length);
-        setStatus("ready");
-      } catch (err) {
-        console.error("Failed to load NWS alerts", err);
-        setStatus("error");
+      // Status badge
+      if (outlookCount || alertCount) {
+        setStatus(
+          `LIVE · ${outlookCount} outlook area${outlookCount !== 1 ? "s" : ""}` +
+            (alertCount ? ` · ${alertCount} alert${alertCount !== 1 ? "s" : ""}` : "")
+        );
+      } else {
+        setStatus("No active outlook or alerts right now");
       }
     }
 
-    loadAlerts();
+    loadLayers();
 
     return () => {
       map.remove();
@@ -213,26 +231,49 @@ export default function StormMap() {
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
       <div id="storm-map" ref={mapRef} style={{ width: "100%", height: "100%" }} />
 
-      {/* Live status badge */}
       <div
         style={{
           position: "absolute",
           top: 12,
           right: 12,
           zIndex: 1000,
-          background: "rgba(5,9,11,0.85)",
-          border: "1px solid rgba(184,221,225,0.2)",
+          background: "rgba(5,9,11,0.88)",
+          border: "1px solid rgba(184,221,225,0.22)",
           borderRadius: 8,
-          padding: "6px 10px",
+          padding: "6px 11px",
           fontSize: 11,
-          color: status === "ready" ? "#d9ff4a" : status === "error" ? "#ff5c5c" : "#8fa6a8",
+          color: "#d9ff4a",
           fontWeight: 600,
-          letterSpacing: "0.04em",
+          letterSpacing: "0.03em",
+          maxWidth: 260,
         }}
       >
-        {status === "loading" && "LOADING LIVE ALERTS…"}
-        {status === "ready" && `LIVE · ${count} ALERTS`}
-        {status === "error" && "ALERTS UNAVAILABLE"}
+        {status}
+      </div>
+
+      {/* Legend */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: 28,
+          left: 12,
+          zIndex: 1000,
+          background: "rgba(5,9,11,0.88)",
+          border: "1px solid rgba(184,221,225,0.18)",
+          borderRadius: 8,
+          padding: "8px 10px",
+          fontSize: 10,
+          color: "#c8d8d9",
+          lineHeight: 1.5,
+        }}
+      >
+        <div style={{ fontWeight: 700, marginBottom: 4, color: "#edf8f7" }}>SPC Day 1 Risk</div>
+        <div><span style={{ color: "#66cc66" }}>■</span> Marginal</div>
+        <div><span style={{ color: "#ffe066" }}>■</span> Slight</div>
+        <div><span style={{ color: "#ff9933" }}>■</span> Enhanced</div>
+        <div><span style={{ color: "#ff3333" }}>■</span> Moderate</div>
+        <div><span style={{ color: "#cc33ff" }}>■</span> High</div>
+        <div style={{ marginTop: 4, opacity: 0.8 }}>Dots = live NWS alerts</div>
       </div>
     </div>
   );
