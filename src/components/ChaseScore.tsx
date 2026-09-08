@@ -17,19 +17,16 @@ function scoreFromAlert(event: string, severity?: string, urgency?: string): num
 
   let base = 45;
 
-  // Severity weight
   if (s === "extreme") base = 92;
   else if (s === "severe") base = 84;
   else if (s === "moderate") base = 70;
   else if (s === "minor") base = 58;
 
-  // Event type boost
   if (e.includes("tornado")) base = Math.min(99, base + 10);
   else if (e.includes("severe thunderstorm")) base = Math.min(96, base + 6);
   else if (e.includes("flash flood")) base = Math.min(93, base + 4);
-  else if (e.includes("hurricane") || e.includes("tropical")) base = Math.min(95, base + 5);
+  else if (e.includes("warning")) base = Math.min(90, base + 2);
 
-  // Urgency
   if (u === "immediate") base = Math.min(99, base + 3);
   else if (u === "expected") base = Math.min(97, base + 1);
 
@@ -40,6 +37,56 @@ function shortArea(areaDesc?: string): string {
   if (!areaDesc) return "Multiple areas";
   const first = areaDesc.split(";")[0]?.trim() || areaDesc;
   return first.length > 42 ? first.slice(0, 40) + "…" : first;
+}
+
+function getCentroid(geometry: any): [number, number] | null {
+  if (!geometry) return null;
+  let coords: number[][] = [];
+  if (geometry.type === "Point") return [geometry.coordinates[1], geometry.coordinates[0]];
+  if (geometry.type === "Polygon") coords = geometry.coordinates[0] || [];
+  else if (geometry.type === "MultiPolygon") coords = geometry.coordinates?.[0]?.[0] || [];
+  else return null;
+  if (!coords.length) return null;
+  let lat = 0, lng = 0, n = 0;
+  for (const c of coords) {
+    if (Array.isArray(c) && c.length >= 2) {
+      lng += c[0];
+      lat += c[1];
+      n++;
+    }
+  }
+  return n ? [lat / n, lng / n] : null;
+}
+
+function isContiguousUS(lat?: number, lng?: number, areaDesc?: string, event?: string): boolean {
+  const e = (event || "").toLowerCase();
+  const a = (areaDesc || "").toLowerCase();
+
+  if (
+    a.includes("hawaii") ||
+    a.includes("kauai") ||
+    a.includes("oahu") ||
+    a.includes("maui") ||
+    a.includes("honolulu") ||
+    a.includes("alaska") ||
+    a.includes("puerto rico") ||
+    a.includes("guam") ||
+    a.includes("virgin islands") ||
+    /\bhi\b/.test(a) ||
+    /\bak\b/.test(a)
+  ) {
+    return false;
+  }
+
+  if (lat != null && lng != null) {
+    if (lat < 24.5 || lat > 49.5 || lng < -125 || lng > -66.5) return false;
+  }
+
+  if (lat == null && (e.includes("hurricane") || e.includes("tropical"))) {
+    return false;
+  }
+
+  return true;
 }
 
 export default function ChaseScore() {
@@ -69,6 +116,10 @@ export default function ChaseScore() {
 
           const event = p.event || "Weather Alert";
           const severity = p.severity || "Unknown";
+          const center = getCentroid(f.geometry);
+
+          if (!isContiguousUS(center?.[0], center?.[1], p.areaDesc, event)) continue;
+
           const score = scoreFromAlert(event, severity, p.urgency);
 
           if (score > bestScore) {
@@ -111,7 +162,7 @@ export default function ChaseScore() {
     return (
       <div className="card target-card">
         <div className="eyebrow">Primary target · LIVE</div>
-        <div className="target-name">No high-impact alerts</div>
+        <div className="target-name">No high-impact CONUS alerts</div>
         <div className="target-meta">All clear or data unavailable · check SPC outlook</div>
         <div className="score-wrap">
           <div className="score">
