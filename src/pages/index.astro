@@ -1,0 +1,196 @@
+---
+import Layout from "../layouts/Layout.astro";
+import ChaseScore from "../components/ChaseScore.astro";
+import TargetBoard from "../components/TargetBoard.astro";
+import StormMap from "../components/StormMap";
+---
+
+<Layout title="Storm IQ | Command">
+
+  <section class="hero">
+
+    <div class="hero-copy">
+
+      <span class="hero-tag">
+        NATIONWIDE STORM INTELLIGENCE
+      </span>
+
+      <h1>
+        KNOW WHERE<br />
+        <span style="color:var(--lime)">
+          THE STORM
+        </span><br />
+        IS GOING.
+      </h1>
+
+      <p>
+        Storm IQ combines official weather guidance,
+        storm environments, timing, target scoring
+        and safety information into one command
+        dashboard for storm observers across the
+        United States.
+      </p>
+
+    </div>
+
+
+    <div class="card">
+
+      <div class="eyebrow">
+        System status
+      </div>
+
+      <h2 style="margin-top:7px">
+        Monitoring
+      </h2>
+
+      <p class="muted">
+        National weather environment online.
+      </p>
+
+      <div
+        class="notice"
+        style="margin-top:20px"
+      >
+
+        <strong>
+          SAFETY FIRST
+        </strong>
+
+        <br />
+
+        Storm IQ does not replace NWS warnings.
+        If a warning conflicts with a target
+        recommendation, follow the official
+        warning and move to safety.
+
+      </div>
+
+    </div>
+
+  </section>
+
+
+  <div class="grid dashboard-grid">
+
+    <ChaseScore />
+
+    <TargetBoard />
+
+  </div>
+
+
+  <div
+    class="grid two"
+    style="margin-top:18px"
+  >
+
+    <div class="card">
+
+      <div class="section-title">
+
+        <div>
+
+          <div class="eyebrow">
+            National view
+          </div>
+
+          <h2>
+            Storm target map
+          </h2>
+
+        </div>
+
+        <span class="small muted">
+          SAMPLE TARGETS
+        </span>
+
+      </div>
+
+      <div class="map-shell">
+
+        <StormMap client:load />
+
+      </div>
+
+    </div>
+
+
+    <div class="card">
+
+      <div class="section-title">
+
+        <div>
+
+          <div class="eyebrow">
+            Decision support
+          </div>
+
+          <h2>
+            Why this target?
+          </h2>
+
+        </div>
+
+      </div>
+
+
+      <div class="alert">
+
+        <strong>
+          Environment improving
+        </strong>
+
+        <p>
+          Instability, moisture and deep-layer
+          shear are weighted strongly in the
+          current demo score.
+        </p>
+
+      </div>
+
+
+      <div class="alert">
+
+        <strong>
+          Timing matters
+        </strong>
+
+        <p>
+          A strong environment is not enough.
+          Storm IQ will eventually combine
+          initiation timing with travel time.
+        </p>
+
+      </div>
+
+
+      <div class="alert">
+
+        <strong>
+          Safety override
+        </strong>
+
+        <p>
+          Warnings, flooding, road closures
+          and safe escape routes must override
+          chase optimization.
+        </p>
+
+      </div>
+
+
+      <p
+        class="small muted"
+        style="margin-top:18px"
+      >
+        The target and scores shown on this
+        first build are demonstration data,
+        not a live forecast.
+      </p>
+
+    </div>
+
+  </div>
+
+</Layout>
