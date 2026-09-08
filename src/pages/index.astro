@@ -1,7 +1,7 @@
 ---
 import Layout from "../layouts/Layout.astro";
-import ChaseScore from "../components/ChaseScore.astro";
-import TargetBoard from "../components/TargetBoard.astro";
+import ChaseScore from "../components/ChaseScore";
+import TargetBoard from "../components/TargetBoard";
 import StormMap from "../components/StormMap";
 ---
 
@@ -73,9 +73,9 @@ import StormMap from "../components/StormMap";
 
   <div class="grid dashboard-grid">
 
-    <ChaseScore />
+    <ChaseScore client:only="react" />
 
-    <TargetBoard />
+    <TargetBoard client:only="react" />
 
   </div>
 
@@ -138,28 +138,13 @@ import StormMap from "../components/StormMap";
       <div class="alert">
 
         <strong>
-          Environment improving
+          Live threat ranking
         </strong>
 
         <p>
-          Instability, moisture and deep-layer
-          shear are weighted strongly in the
-          current demo score.
-        </p>
-
-      </div>
-
-
-      <div class="alert">
-
-        <strong>
-          Timing matters
-        </strong>
-
-        <p>
-          A strong environment is not enough.
-          Storm IQ will eventually combine
-          initiation timing with travel time.
+          The primary target and board are ranked
+          from current National Weather Service
+          alerts by severity and event type.
         </p>
 
       </div>
@@ -172,9 +157,24 @@ import StormMap from "../components/StormMap";
         </strong>
 
         <p>
-          Warnings, flooding, road closures
-          and safe escape routes must override
-          chase optimization.
+          Official warnings always take priority.
+          Never use this dashboard in place of
+          NWS warnings or local emergency guidance.
+        </p>
+
+      </div>
+
+
+      <div class="alert">
+
+        <strong>
+          Next layer
+        </strong>
+
+        <p>
+          Future versions will add SPC outlooks,
+          model parameters (CAPE, shear), and
+          timing/travel scoring.
         </p>
 
       </div>
@@ -184,9 +184,10 @@ import StormMap from "../components/StormMap";
         class="small muted"
         style="margin-top:18px"
       >
-        Target scores on this dashboard are still
-        demonstration data. The map shows live
-        National Weather Service alerts.
+        Scores are derived from live NWS alert
+        severity. This is operational guidance
+        support, not a replacement for official
+        forecasts.
       </p>
 
     </div>
