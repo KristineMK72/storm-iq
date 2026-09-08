@@ -53,7 +53,9 @@ function severityColor(severity?: string): string {
 export default function StormMap() {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<L.Map | null>(null);
+  const radarLayerRef = useRef<L.TileLayer | null>(null);
   const [status, setStatus] = useState("Loading outlook & alerts…");
+  const [radarOn, setRadarOn] = useState(true);
 
   useEffect(() => {
     if (!mapRef.current || mapInstance.current) return;
@@ -75,9 +77,21 @@ export default function StormMap() {
       }
     ).addTo(map);
 
+    // Live NEXRAD base reflectivity (Iowa State Mesonet – free NWS data)
+    const radar = L.tileLayer(
+      "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png",
+      {
+        attribution: "Radar © Iowa State Mesonet / NWS NEXRAD",
+        opacity: 0.65,
+        zIndex: 200,
+        maxZoom: 12,
+      }
+    );
+    radar.addTo(map);
+    radarLayerRef.current = radar;
+
     mapInstance.current = map;
 
-    // Critical: force Leaflet to recalculate size after the container is visible
     const resize = () => map.invalidateSize();
     setTimeout(resize, 100);
     setTimeout(resize, 400);
@@ -87,7 +101,7 @@ export default function StormMap() {
       let outlookCount = 0;
       let alertCount = 0;
 
-      // ── 1. SPC Day 1 Categorical Outlook (look-ahead) ──────────────
+      // ── 1. SPC Day 1 Categorical Outlook ───────────────────────────
       try {
         const res = await fetch(
           "https://www.spc.noaa.gov/products/outlook/day1otlk_cat.nolyr.geojson",
@@ -108,7 +122,7 @@ export default function StormMap() {
                 color: color,
                 weight: 2,
                 fillColor: color,
-                fillOpacity: label === "TSTM" ? 0.15 : 0.32,
+                fillOpacity: label === "TSTM" ? 0.12 : 0.28,
               },
             }).addTo(map);
 
@@ -213,14 +227,12 @@ export default function StormMap() {
 
       if (outlookCount || alertCount) {
         setStatus(
-          `LIVE · ${outlookCount} outlook area${outlookCount !== 1 ? "s" : ""}` +
-            (alertCount ? ` · ${alertCount} alert${alertCount !== 1 ? "s" : ""}` : "")
+          `LIVE · ${outlookCount} outlook · ${alertCount} alert${alertCount !== 1 ? "s" : ""}`
         );
       } else {
-        setStatus("No active outlook or alerts right now");
+        setStatus("LIVE · Radar on · No high-impact alerts");
       }
 
-      // One more size fix after layers load
       setTimeout(() => map.invalidateSize(), 100);
     }
 
@@ -230,8 +242,22 @@ export default function StormMap() {
       window.removeEventListener("resize", resize);
       map.remove();
       mapInstance.current = null;
+      radarLayerRef.current = null;
     };
   }, []);
+
+  // Toggle radar visibility
+  useEffect(() => {
+    const radar = radarLayerRef.current;
+    const map = mapInstance.current;
+    if (!radar || !map) return;
+
+    if (radarOn) {
+      if (!map.hasLayer(radar)) radar.addTo(map);
+    } else {
+      if (map.hasLayer(radar)) map.removeLayer(radar);
+    }
+  }, [radarOn]);
 
   return (
     <div
@@ -254,6 +280,7 @@ export default function StormMap() {
         }}
       />
 
+      {/* Status */}
       <div
         style={{
           position: "absolute",
@@ -274,6 +301,31 @@ export default function StormMap() {
         {status}
       </div>
 
+      {/* Radar toggle */}
+      <button
+        onClick={() => setRadarOn((v) => !v)}
+        style={{
+          position: "absolute",
+          top: 12,
+          left: 12,
+          zIndex: 1000,
+          background: radarOn ? "rgba(217,255,74,0.18)" : "rgba(5,9,11,0.88)",
+          border: radarOn
+            ? "1px solid rgba(217,255,74,0.5)"
+            : "1px solid rgba(184,221,225,0.22)",
+          borderRadius: 8,
+          padding: "6px 12px",
+          fontSize: 11,
+          color: radarOn ? "#d9ff4a" : "#8fa6a8",
+          fontWeight: 700,
+          letterSpacing: "0.04em",
+          cursor: "pointer",
+        }}
+      >
+        {radarOn ? "RADAR ON" : "RADAR OFF"}
+      </button>
+
+      {/* Legend */}
       <div
         style={{
           position: "absolute",
@@ -290,14 +342,15 @@ export default function StormMap() {
         }}
       >
         <div style={{ fontWeight: 700, marginBottom: 4, color: "#edf8f7" }}>
-          SPC Day 1 Risk
+          Layers
         </div>
         <div><span style={{ color: "#66cc66" }}>■</span> Marginal</div>
         <div><span style={{ color: "#ffe066" }}>■</span> Slight</div>
         <div><span style={{ color: "#ff9933" }}>■</span> Enhanced</div>
         <div><span style={{ color: "#ff3333" }}>■</span> Moderate</div>
         <div><span style={{ color: "#cc33ff" }}>■</span> High</div>
-        <div style={{ marginTop: 4, opacity: 0.8 }}>Dots = live NWS alerts</div>
+        <div style={{ marginTop: 4, opacity: 0.85 }}>Radar = NEXRAD</div>
+        <div style={{ opacity: 0.85 }}>Dots = NWS alerts</div>
       </div>
     </div>
   );
