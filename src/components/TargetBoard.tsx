@@ -23,15 +23,17 @@ function scoreFromAlert(event: string, severity?: string, urgency?: string): num
   const s = (severity || "").toLowerCase();
   const u = (urgency || "").toLowerCase();
 
-  let base = 45;
+  let base = 40;
   if (s === "extreme") base = 92;
   else if (s === "severe") base = 84;
   else if (s === "moderate") base = 70;
   else if (s === "minor") base = 58;
+  else base = 55;
 
   if (e.includes("tornado")) base = Math.min(99, base + 10);
   else if (e.includes("severe thunderstorm")) base = Math.min(96, base + 6);
   else if (e.includes("flash flood")) base = Math.min(93, base + 4);
+  else if (e.includes("warning")) base = Math.min(90, base + 3);
 
   if (u === "immediate") base = Math.min(99, base + 3);
 
@@ -73,6 +75,7 @@ export default function TargetBoard() {
   const [items, setItems] = useState<BoardItem[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "empty" | "error">("loading");
   const [home, setHome] = useState<HomeBase | null>(null);
+  const [etaStatus, setEtaStatus] = useState<"idle" | "calc" | "done">("idle");
 
   useEffect(() => {
     setHome(loadHomeBase());
@@ -82,7 +85,12 @@ export default function TargetBoard() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function load() {
+      setStatus("loading");
+      setEtaStatus("idle");
+
       try {
         const res = await fetch("https://api.weather.gov/alerts/active", {
           headers: {
@@ -103,7 +111,9 @@ export default function TargetBoard() {
           const event = p.event || "Weather Alert";
           const severity = p.severity || "Unknown";
           const score = scoreFromAlert(event, severity, p.urgency);
-          if (score < 62) continue;
+
+          // Lower threshold so quiet days still show something
+          if (score < 55) continue;
 
           let statusLabel = "ACTIVE";
           if (severity === "Extreme" || severity === "Severe") statusLabel = "WARNING";
@@ -131,32 +141,46 @@ export default function TargetBoard() {
           if (seen.has(key)) continue;
           seen.add(key);
           unique.push(item);
-          if (unique.length >= 5) break;
+          if (unique.length >= 6) break;
         }
 
-        // Attach ETAs if home base is set
+        if (cancelled) return;
+
+        // Compute ETAs when home is set
         const currentHome = loadHomeBase();
-        if (currentHome) {
+        if (currentHome && unique.length) {
+          setEtaStatus("calc");
           await Promise.all(
             unique.map(async (item) => {
               if (item.lat == null || item.lng == null) return;
-              const eta = await estimateDriveMinutes(currentHome, {
-                lat: item.lat,
-                lng: item.lng,
-              });
-              item.etaMin = eta.minutes;
-              item.etaMiles = eta.miles;
+              try {
+                const eta = await estimateDriveMinutes(currentHome, {
+                  lat: item.lat,
+                  lng: item.lng,
+                });
+                item.etaMin = eta.minutes;
+                item.etaMiles = eta.miles;
+              } catch {
+                // leave blank
+              }
             })
           );
+          if (!cancelled) setEtaStatus("done");
         }
 
-        setItems([...unique]);
-        setStatus(unique.length > 0 ? "ready" : "empty");
+        if (!cancelled) {
+          setItems([...unique]);
+          setStatus(unique.length > 0 ? "ready" : "empty");
+        }
       } catch {
-        setStatus("error");
+        if (!cancelled) setStatus("error");
       }
     }
+
     load();
+    return () => {
+      cancelled = true;
+    };
   }, [home]);
 
   return (
@@ -167,9 +191,21 @@ export default function TargetBoard() {
           <h2>Top storm targets</h2>
         </div>
         <span className="small muted">
-          {status === "ready" ? (home ? "LIVE + ETA" : "LIVE NWS") : status === "loading" ? "LOADING…" : "LIVE"}
+          {status === "loading"
+            ? "LOADING…"
+            : etaStatus === "calc"
+            ? "CALC ETA…"
+            : home
+            ? "LIVE + ETA"
+            : "LIVE NWS"}
         </span>
       </div>
+
+      {!home && status === "ready" && (
+        <p className="small muted" style={{ marginTop: 4, marginBottom: 8 }}>
+          Set Home base above to see drive times.
+        </p>
+      )}
 
       {status === "loading" && (
         <p className="muted" style={{ marginTop: 12 }}>Loading live alerts…</p>
@@ -177,7 +213,7 @@ export default function TargetBoard() {
 
       {(status === "empty" || status === "error") && (
         <p className="muted" style={{ marginTop: 12 }}>
-          No high-impact alerts at the moment. Check the map for SPC outlook.
+          No ranked alerts right now. Check the map for SPC outlook & radar.
         </p>
       )}
 
@@ -188,9 +224,14 @@ export default function TargetBoard() {
             <strong>{item.name}</strong>
             <div className="small muted">
               {item.state} · {item.event}
-              {item.etaMin != null && (
-                <> · ~{formatDuration(item.etaMin)} · {item.etaMiles} mi</>
-              )}
+              {item.etaMin != null ? (
+                <>
+                  {" "}· <span style={{ color: "var(--lime)" }}>~{formatDuration(item.etaMin)}</span>
+                  {" "}· {item.etaMiles} mi
+                </>
+              ) : home && item.lat == null ? (
+                <> · no location</>
+              ) : null}
             </div>
           </div>
           <div className={`badge ${item.status === "WARNING" ? "warn" : ""}`}>
@@ -200,9 +241,9 @@ export default function TargetBoard() {
         </div>
       ))}
 
-      {home && items.some((i) => i.etaMin != null) && (
+      {home && etaStatus === "done" && items.some((i) => i.etaMin != null) && (
         <p className="small muted" style={{ marginTop: 10 }}>
-          ETAs are driving estimates from your home base (OSRM / distance).
+          ETAs are approximate drive times from your home base.
         </p>
       )}
     </div>

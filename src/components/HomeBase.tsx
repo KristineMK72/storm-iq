@@ -32,14 +32,17 @@ export default function HomeBase() {
         saveHomeBase(next);
         setHome(next);
         setBusy(false);
-        // Notify other components
         window.dispatchEvent(new Event("stormiq-home-updated"));
       },
-      () => {
+      (err) => {
         setBusy(false);
-        setError("Could not get location. Check browser permissions.");
+        if (err.code === 1) {
+          setError("Location permission denied. Enable it in browser settings.");
+        } else {
+          setError("Could not get location. Try again or check permissions.");
+        }
       },
-      { enableHighAccuracy: true, timeout: 12000 }
+      { enableHighAccuracy: true, timeout: 15000 }
     );
   }
 
@@ -69,10 +72,13 @@ export default function HomeBase() {
           <strong style={{ fontSize: 14 }}>
             {home.label || `${home.lat.toFixed(3)}, ${home.lng.toFixed(3)}`}
           </strong>
+          <div className="small muted" style={{ marginTop: 2 }}>
+            {home.lat.toFixed(4)}, {home.lng.toFixed(4)}
+          </div>
         </div>
       ) : (
         <p className="small muted" style={{ marginBottom: 12 }}>
-          No home base yet — targets will show without ETA.
+          No home base yet — tap the button and allow location access.
         </p>
       )}
 
@@ -91,7 +97,7 @@ export default function HomeBase() {
             cursor: busy ? "wait" : "pointer",
           }}
         >
-          {busy ? "LOCATING…" : "USE MY LOCATION"}
+          {busy ? "LOCATING…" : home ? "UPDATE LOCATION" : "USE MY LOCATION"}
         </button>
 
         {home && (
@@ -114,7 +120,7 @@ export default function HomeBase() {
       </div>
 
       {error && (
-        <p style={{ color: "var(--orange)", fontSize: 12, marginTop: 10 }}>{error}</p>
+        <p style={{ color: "#ff9f43", fontSize: 12, marginTop: 10 }}>{error}</p>
       )}
     </div>
   );

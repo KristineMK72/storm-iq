@@ -8,6 +8,7 @@ export type HomeBase = {
 
 export function loadHomeBase(): HomeBase | null {
   try {
+    if (typeof localStorage === "undefined") return null;
     const raw = localStorage.getItem(KEY);
     if (!raw) return null;
     return JSON.parse(raw) as HomeBase;
@@ -40,35 +41,49 @@ export function milesBetween(
   return 2 * R * Math.asin(Math.sqrt(x));
 }
 
-/** Estimate drive time via public OSRM (fallback to distance/speed) */
+/**
+ * Drive-time estimate.
+ * Primary: road-distance factor on great-circle (reliable, no external API).
+ * Optional: try OSRM if available (may be blocked in some browsers).
+ */
 export async function estimateDriveMinutes(
   from: { lat: number; lng: number },
   to: { lat: number; lng: number }
 ): Promise<{ minutes: number; miles: number; source: "osrm" | "estimate" }> {
-  const miles = milesBetween(from, to);
+  const straightMiles = milesBetween(from, to);
 
+  // Try OSRM quickly; fall back fast
   try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3500);
+
     const url = `https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=false`;
-    const res = await fetch(url);
+    const res = await fetch(url, { signal: controller.signal });
+    clearTimeout(timer);
+
     if (res.ok) {
       const data = await res.json();
       const sec = data?.routes?.[0]?.duration;
+      const distM = data?.routes?.[0]?.distance;
       if (typeof sec === "number" && sec > 0) {
         return {
-          minutes: Math.round(sec / 60),
-          miles: Math.round(miles),
+          minutes: Math.max(1, Math.round(sec / 60)),
+          miles: Math.round(typeof distM === "number" ? distM / 1609.34 : straightMiles * 1.25),
           source: "osrm",
         };
       }
     }
   } catch {
-    // fall through
+    // ignore — use estimate
   }
 
-  // Fallback: assume ~55 mph average including stops
+  // Road miles ≈ straight × 1.25; average ~50 mph including towns/stops
+  const roadMiles = straightMiles * 1.25;
+  const minutes = Math.max(1, Math.round((roadMiles / 50) * 60));
+
   return {
-    minutes: Math.round((miles / 55) * 60),
-    miles: Math.round(miles),
+    minutes,
+    miles: Math.round(roadMiles),
     source: "estimate",
   };
 }
