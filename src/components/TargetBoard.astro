@@ -1,0 +1,75 @@
+---
+const targets = [
+  ["Eastern South Dakota", "86", "RISING", "SD"],
+  ["Central Nebraska", "81", "RISING", "NE"],
+  ["Western Iowa", "77", "STEADY", "IA"],
+  ["Southern Minnesota", "71", "WATCH", "MN"],
+  ["Northern Kansas", "68", "WATCH", "KS"],
+];
+---
+
+<div class="card">
+
+  <div class="section-title">
+
+    <div>
+
+      <div class="eyebrow">
+        National board
+      </div>
+
+      <h2>
+        Top storm targets
+      </h2>
+
+    </div>
+
+    <span class="small muted">
+      DEMO SCORING
+    </span>
+
+  </div>
+
+
+  {targets.map((target, index) => (
+
+    <div class="target-row">
+
+      <div class="rank">
+        0{index + 1}
+      </div>
+
+
+      <div>
+
+        <strong>
+          {target[0]}
+        </strong>
+
+        <div class="small muted">
+          {target[3]} · environment monitored
+        </div>
+
+      </div>
+
+
+      <div
+        class={`badge ${
+          target[2] === "WATCH"
+            ? "warn"
+            : ""
+        }`}
+      >
+        {target[2]}
+      </div>
+
+
+      <div class="score-num">
+        {target[1]}
+      </div>
+
+    </div>
+
+  ))}
+
+</div>
