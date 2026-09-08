@@ -1,0 +1,94 @@
+---
+const score = 86;
+
+const metrics = [
+  ["Instability", 94],
+  ["Deep-layer shear", 89],
+  ["Low-level shear", 82],
+  ["Moisture", 91],
+  ["Forcing", 78],
+  ["Boundary", 88],
+  ["Timing", 84],
+  ["Accessibility", 76],
+];
+---
+
+<div class="card target-card">
+
+  <div class="eyebrow">
+    Primary target
+  </div>
+
+  <div class="target-name">
+    Eastern South Dakota
+  </div>
+
+  <div class="target-meta">
+    DEMO TARGET · SAMPLE DATA · VERIFY LIVE GUIDANCE
+  </div>
+
+
+  <div class="score-wrap">
+
+    <div class="score">
+
+      <b>{score}</b>
+
+      <small>
+        Chase Score
+      </small>
+
+    </div>
+
+
+    <div class="metric-list">
+
+      {metrics.map(([label, value]) => (
+
+        <div class="metric">
+
+          <label>
+            {label}
+          </label>
+
+          <div class="bar">
+            <i style={`width:${value}%`}></i>
+          </div>
+
+        </div>
+
+      ))}
+
+    </div>
+
+  </div>
+
+
+  <div
+    class="kpis"
+    style="margin-top:22px"
+  >
+
+    <div class="kpi">
+      <span>Storm window</span>
+      <b>3–7 PM</b>
+    </div>
+
+    <div class="kpi">
+      <span>Departure</span>
+      <b>11:45 AM</b>
+    </div>
+
+    <div class="kpi">
+      <span>Hail</span>
+      <b>HIGH</b>
+    </div>
+
+    <div class="kpi">
+      <span>Tornado</span>
+      <b>RISING</b>
+    </div>
+
+  </div>
+
+</div>
