@@ -6,29 +6,57 @@ export default function ModelGuidance() {
 
   useEffect(() => {
     async function load() {
-      try {
-        const res = await fetch(
-          "https://www.spc.noaa.gov/products/outlook/day1otlk.txt",
-          { headers: { "User-Agent": "StormIQ" } }
-        );
-        if (!res.ok) throw new Error("SPC failed");
+      // Try a couple of endpoints / modes — SPC is occasionally flaky from browsers
+      const urls = [
+        "https://www.spc.noaa.gov/products/outlook/day1otlk.txt",
+        "https://www.spc.noaa.gov/products/outlook/day1otlk.html",
+      ];
 
-        let raw = await res.text();
-        raw = raw.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+      for (const url of urls) {
+        try {
+          const res = await fetch(url, {
+            mode: "cors",
+            cache: "no-cache",
+          });
+          if (!res.ok) continue;
 
-        // Prefer the SUMMARY section
-        const idx = raw.search(/\.\.\.SUMMARY\.\.\./i);
-        let text = idx >= 0 ? raw.slice(idx) : raw;
+          let raw = await res.text();
 
-        // Keep it short for the card
-        if (text.length > 900) text = text.slice(0, 900) + "…";
+          // If we got HTML, try to extract the preformatted product text
+          if (url.endsWith(".html")) {
+            const preMatch = raw.match(/<pre[^>]*>([\s\S]*?)<\/pre>/i);
+            if (preMatch?.[1]) {
+              raw = preMatch[1]
+                .replace(/<[^>]+>/g, "")
+                .replace(/&nbsp;/g, " ")
+                .replace(/&amp;/g, "&")
+                .replace(/&lt;/g, "<")
+                .replace(/&gt;/g, ">");
+            } else {
+              continue;
+            }
+          }
 
-        setSummary(text);
-        setStatus("ready");
-      } catch {
-        setStatus("error");
+          raw = raw.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+
+          const idx = raw.search(/\.\.\.SUMMARY\.\.\./i);
+          let text = idx >= 0 ? raw.slice(idx) : raw;
+
+          if (text.length > 900) text = text.slice(0, 900) + "…";
+
+          if (text.length > 40) {
+            setSummary(text);
+            setStatus("ready");
+            return;
+          }
+        } catch {
+          // try next url
+        }
       }
+
+      setStatus("error");
     }
+
     load();
   }, []);
 
@@ -40,24 +68,37 @@ export default function ModelGuidance() {
           <h2>Guidance snapshot</h2>
         </div>
         <span className="small muted">
-          {status === "ready" ? "LIVE SPC" : status === "loading" ? "LOADING…" : "—"}
+          {status === "ready" ? "LIVE SPC" : status === "loading" ? "LOADING…" : "SPC LINK"}
         </span>
       </div>
 
       {status === "loading" && <p className="muted">Loading SPC summary…</p>}
 
       {status === "error" && (
-        <p className="muted">
-          Could not load summary.{" "}
+        <div style={{ marginBottom: 14 }}>
+          <p className="muted" style={{ marginBottom: 10 }}>
+            Summary text couldn’t be loaded in-browser (SPC sometimes blocks
+            direct fetches). Use the official product instead:
+          </p>
           <a
-            href="https://www.spc.noaa.gov/products/outlook/"
+            href="https://www.spc.noaa.gov/products/outlook/day1otlk.html"
             target="_blank"
             rel="noopener"
-            style={{ color: "var(--cyan)" }}
+            style={{
+              display: "inline-block",
+              background: "rgba(82,224,208,0.12)",
+              border: "1px solid rgba(82,224,208,0.35)",
+              color: "var(--cyan)",
+              borderRadius: 8,
+              padding: "8px 12px",
+              fontWeight: 700,
+              fontSize: 13,
+              textDecoration: "none",
+            }}
           >
-            Open SPC →
+            Open Day 1 discussion on SPC →
           </a>
-        </p>
+        </div>
       )}
 
       {status === "ready" && summary && (
