@@ -27,6 +27,16 @@ type BoardItem = {
   lng?: number;
   etaMin?: number;
   etaMiles?: number;
+  kind?: "alert" | "outlook";
+};
+
+const RISK_SCORE: Record<string, number> = {
+  HIGH: 95,
+  MDT: 88,
+  ENH: 78,
+  SLGT: 68,
+  MRGL: 58,
+  TSTM: 48,
 };
 
 function scoreFromAlert(event: string, severity?: string, urgency?: string): number {
@@ -69,7 +79,13 @@ function getCentroid(geometry: any): [number, number] | null {
   if (geometry.type === "Point") return [geometry.coordinates[1], geometry.coordinates[0]];
   if (geometry.type === "Polygon") coords = geometry.coordinates[0] || [];
   else if (geometry.type === "MultiPolygon") coords = geometry.coordinates?.[0]?.[0] || [];
-  else return null;
+  else if (geometry.type === "GeometryCollection") {
+    for (const g of geometry.geometries || []) {
+      const c = getCentroid(g);
+      if (c) return c;
+    }
+    return null;
+  } else return null;
   if (!coords.length) return null;
   let lat = 0, lng = 0, n = 0;
   for (const c of coords) {
@@ -122,12 +138,57 @@ function fmtTime(iso?: string) {
   }
 }
 
+async function loadOutlookTargets(): Promise<BoardItem[]> {
+  try {
+    const res = await fetch(
+      "https://www.spc.noaa.gov/products/outlook/day1otlk_cat.nolyr.geojson"
+    );
+    if (!res.ok) return [];
+    const geo = await res.json();
+    const items: BoardItem[] = [];
+
+    for (const f of geo?.features || []) {
+      const label = (f.properties?.LABEL || f.properties?.label || "TSTM").toUpperCase();
+      if (label === "TSTM") continue; // skip general thunder for targets
+      const score = RISK_SCORE[label] || 50;
+      const center = getCentroid(f.geometry);
+      if (!center) continue;
+      if (!isContiguousUS(center[0], center[1])) continue;
+
+      items.push({
+        id: `outlook-${label}-${center[0].toFixed(2)}-${center[1].toFixed(2)}`,
+        name: `Day 1 ${label} risk`,
+        score,
+        status: "OUTLOOK",
+        state: "US",
+        event: `SPC categorical ${label}`,
+        severity: label === "HIGH" || label === "MDT" ? "Severe" : "Moderate",
+        headline: `SPC Day 1 ${label} risk area — watch window, not a warning`,
+        description:
+          "This is a Storm Prediction Center categorical outlook area. It highlights where organized severe storms are more likely today/tonight. It is NOT an NWS warning. Monitor for watches and warnings before traveling.",
+        instruction:
+          "Use as a planning guide only. If a watch or warning is issued for your area, follow official NWS guidance and local emergency instructions.",
+        areaDesc: `SPC Day 1 ${label} contour`,
+        lat: center[0],
+        lng: center[1],
+        kind: "outlook",
+      });
+    }
+
+    items.sort((a, b) => b.score - a.score);
+    return items.slice(0, 5);
+  } catch {
+    return [];
+  }
+}
+
 export default function TargetBoard() {
   const [items, setItems] = useState<BoardItem[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "empty" | "error">("loading");
   const [home, setHome] = useState<HomeBase | null>(null);
   const [etaStatus, setEtaStatus] = useState<"idle" | "calc" | "done">("idle");
   const [openId, setOpenId] = useState<string | null>(null);
+  const [mode, setMode] = useState<"alerts" | "outlook">("alerts");
 
   useEffect(() => {
     setHome(loadHomeBase());
@@ -194,6 +255,7 @@ export default function TargetBoard() {
             senderName: p.senderName,
             lat,
             lng,
+            kind: "alert",
           });
         }
 
@@ -209,13 +271,22 @@ export default function TargetBoard() {
           if (unique.length >= 6) break;
         }
 
+        let finalItems = unique;
+        let finalMode: "alerts" | "outlook" = "alerts";
+
+        // Quiet-day mode: fall back to SPC outlook risk areas
+        if (unique.length === 0) {
+          finalItems = await loadOutlookTargets();
+          finalMode = "outlook";
+        }
+
         if (cancelled) return;
 
         const currentHome = loadHomeBase();
-        if (currentHome && unique.length) {
+        if (currentHome && finalItems.length) {
           setEtaStatus("calc");
           await Promise.all(
-            unique.map(async (item) => {
+            finalItems.map(async (item) => {
               if (item.lat == null || item.lng == null) return;
               try {
                 const eta = await estimateDriveMinutes(currentHome, {
@@ -233,8 +304,9 @@ export default function TargetBoard() {
         }
 
         if (!cancelled) {
-          setItems([...unique]);
-          setStatus(unique.length > 0 ? "ready" : "empty");
+          setItems([...finalItems]);
+          setMode(finalMode);
+          setStatus(finalItems.length > 0 ? "ready" : "empty");
         }
       } catch {
         if (!cancelled) setStatus("error");
@@ -242,8 +314,10 @@ export default function TargetBoard() {
     }
 
     load();
+    const interval = window.setInterval(load, 180000);
     return () => {
       cancelled = true;
+      window.clearInterval(interval);
     };
   }, [home]);
 
@@ -259,13 +333,22 @@ export default function TargetBoard() {
             ? "LOADING…"
             : etaStatus === "calc"
             ? "CALC ETA…"
+            : mode === "outlook"
+            ? "WATCH WINDOWS"
             : home
             ? "LIVE + ETA"
             : "LIVE NWS"}
         </span>
       </div>
 
-      {!home && status === "ready" && (
+      {mode === "outlook" && status === "ready" && (
+        <p className="small muted" style={{ marginTop: 4, marginBottom: 8 }}>
+          Quiet on active CONUS warnings — showing SPC Day 1 risk areas as
+          planning watch windows (not warnings).
+        </p>
+      )}
+
+      {!home && status === "ready" && mode === "alerts" && (
         <p className="small muted" style={{ marginTop: 4, marginBottom: 8 }}>
           Set Home base above to see drive times. Tap a target for full warning detail.
         </p>
@@ -277,7 +360,7 @@ export default function TargetBoard() {
 
       {(status === "empty" || status === "error") && (
         <p className="muted" style={{ marginTop: 12 }}>
-          No ranked CONUS alerts right now. Check the map for SPC outlook & radar.
+          No ranked targets right now. Check Upcoming Potential and the map.
         </p>
       )}
 
@@ -314,10 +397,20 @@ export default function TargetBoard() {
                       {" "}· {item.etaMiles} mi
                     </>
                   ) : null}
-                  <span style={{ opacity: 0.7 }}> · {open ? "hide detail" : "tap for detail"}</span>
+                  <span style={{ opacity: 0.7 }}>
+                    {" "}· {open ? "hide detail" : "tap for detail"}
+                  </span>
                 </div>
               </div>
-              <div className={`badge ${item.status === "WARNING" ? "warn" : ""}`}>
+              <div
+                className={`badge ${
+                  item.status === "WARNING"
+                    ? "warn"
+                    : item.status === "OUTLOOK"
+                    ? ""
+                    : ""
+                }`}
+              >
                 {item.status}
               </div>
               <div className="score-num">{item.score}</div>
@@ -335,6 +428,23 @@ export default function TargetBoard() {
                   lineHeight: 1.5,
                 }}
               >
+                {item.kind === "outlook" && (
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: "#ffd166",
+                      marginBottom: 10,
+                      padding: 8,
+                      borderRadius: 8,
+                      background: "rgba(255,209,102,0.08)",
+                      border: "1px solid rgba(255,209,102,0.25)",
+                    }}
+                  >
+                    Watch window only — not an NWS warning. Do not treat this as
+                    a go/no-go for driving into storms.
+                  </div>
+                )}
+
                 {item.headline && (
                   <div style={{ fontWeight: 700, marginBottom: 8, color: "var(--text)" }}>
                     {item.headline}
@@ -364,7 +474,7 @@ export default function TargetBoard() {
                   </div>
                   <div>
                     <div className="small muted">Office</div>
-                    <strong style={{ fontSize: 11 }}>{item.senderName || "NWS"}</strong>
+                    <strong style={{ fontSize: 11 }}>{item.senderName || "NWS / SPC"}</strong>
                   </div>
                 </div>
 
@@ -397,7 +507,7 @@ export default function TargetBoard() {
                 {item.description && (
                   <>
                     <div className="small muted" style={{ marginBottom: 4 }}>
-                      Warning text
+                      Full detail
                     </div>
                     <pre
                       style={{
@@ -419,7 +529,7 @@ export default function TargetBoard() {
                 {item.instruction && (
                   <>
                     <div className="small muted" style={{ marginBottom: 4 }}>
-                      Instructions
+                      Instructions / safety
                     </div>
                     <div
                       style={{
@@ -439,24 +549,10 @@ export default function TargetBoard() {
                 )}
 
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <a
-                    href="/map"
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: "var(--cyan)",
-                    }}
-                  >
+                  <a href="/map" style={{ fontSize: 11, fontWeight: 700, color: "var(--cyan)" }}>
                     Open map →
                   </a>
-                  <a
-                    href="/alerts"
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: "var(--cyan)",
-                    }}
-                  >
+                  <a href="/alerts" style={{ fontSize: 11, fontWeight: 700, color: "var(--cyan)" }}>
                     All alerts →
                   </a>
                 </div>

@@ -47,7 +47,13 @@ function getCentroid(geometry: any): [number, number] | null {
   if (geometry.type === "Point") return [geometry.coordinates[1], geometry.coordinates[0]];
   if (geometry.type === "Polygon") coords = geometry.coordinates[0] || [];
   else if (geometry.type === "MultiPolygon") coords = geometry.coordinates?.[0]?.[0] || [];
-  else return null;
+  else if (geometry.type === "GeometryCollection") {
+    for (const g of geometry.geometries || []) {
+      const c = getCentroid(g);
+      if (c) return c;
+    }
+    return null;
+  } else return null;
   if (!coords.length) return null;
   let lat = 0, lng = 0, n = 0;
   for (const c of coords) {
@@ -58,6 +64,16 @@ function getCentroid(geometry: any): [number, number] | null {
     }
   }
   return n ? [lat / n, lng / n] : null;
+}
+
+function hasDrawableGeometry(geometry: any): boolean {
+  if (!geometry) return false;
+  if (geometry.type === "GeometryCollection") {
+    return (geometry.geometries || []).some((g: any) => hasDrawableGeometry(g));
+  }
+  if (geometry.type === "Polygon" || geometry.type === "MultiPolygon") return true;
+  if (geometry.type === "Point") return true;
+  return false;
 }
 
 function severityColor(severity?: string): string {
@@ -86,6 +102,23 @@ function isDangerousEvent(event?: string): boolean {
   );
 }
 
+function btnStyle(active: boolean): React.CSSProperties {
+  return {
+    background: active ? "rgba(217,255,74,0.18)" : "rgba(5,9,11,0.88)",
+    border: active
+      ? "1px solid rgba(217,255,74,0.5)"
+      : "1px solid rgba(184,221,225,0.22)",
+    borderRadius: 8,
+    padding: "5px 10px",
+    fontSize: 10,
+    color: active ? "#d9ff4a" : "#8fa6a8",
+    fontWeight: 700,
+    letterSpacing: "0.04em",
+    cursor: "pointer",
+    textAlign: "left",
+  };
+}
+
 export default function StormMap() {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<L.Map | null>(null);
@@ -93,13 +126,16 @@ export default function StormMap() {
   const routeLayerRef = useRef<L.Polyline | null>(null);
   const tornLayerRef = useRef<L.LayerGroup | null>(null);
   const hailLayerRef = useRef<L.LayerGroup | null>(null);
+  const dynamicRef = useRef<L.LayerGroup | null>(null);
 
   const [status, setStatus] = useState("Loading layers…");
   const [radarOn, setRadarOn] = useState(true);
   const [showTorn, setShowTorn] = useState(true);
-  const [showHail, setShowHail] = useState(false);
+  const [showHail, setShowHail] = useState(true); // ON by default
   const [showCities, setShowCities] = useState(true);
+  const [showPolygons, setShowPolygons] = useState(true);
   const [routeInfo, setRouteInfo] = useState("");
+  const [lastRefresh, setLastRefresh] = useState("");
   const [selected, setSelected] = useState<{
     lat: number;
     lng: number;
@@ -109,6 +145,8 @@ export default function StormMap() {
 
   const selectedRef = useRef(selected);
   selectedRef.current = selected;
+  const showPolygonsRef = useRef(showPolygons);
+  showPolygonsRef.current = showPolygons;
 
   useEffect(() => {
     if (!mapRef.current || mapInstance.current) return;
@@ -133,7 +171,7 @@ export default function StormMap() {
       "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png",
       {
         attribution: "Radar © Iowa State Mesonet / NWS NEXRAD",
-        opacity: 0.6,
+        opacity: 0.55,
         zIndex: 200,
         maxZoom: 12,
       }
@@ -142,7 +180,8 @@ export default function StormMap() {
     radarLayerRef.current = radar;
 
     tornLayerRef.current = L.layerGroup().addTo(map);
-    hailLayerRef.current = L.layerGroup();
+    hailLayerRef.current = L.layerGroup().addTo(map); // start on map
+    dynamicRef.current = L.layerGroup().addTo(map);
 
     const cityGroup = L.layerGroup();
     CITIES.forEach((c) => {
@@ -185,9 +224,19 @@ export default function StormMap() {
     window.addEventListener("resize", resize);
 
     async function loadLayers() {
+      const map = mapInstance.current;
+      if (!map || !dynamicRef.current || !tornLayerRef.current || !hailLayerRef.current) return;
+
+      dynamicRef.current.clearLayers();
+      tornLayerRef.current.clearLayers();
+      hailLayerRef.current.clearLayers();
+
       let outlookCount = 0;
       let alertCount = 0;
+      let hailCount = 0;
+      let tornCount = 0;
 
+      // Day 1 categorical
       try {
         const res = await fetch(
           "https://www.spc.noaa.gov/products/outlook/day1otlk_cat.nolyr.geojson"
@@ -197,17 +246,19 @@ export default function StormMap() {
           (geo?.features || []).forEach((f: any) => {
             const label = (f.properties?.LABEL || f.properties?.label || "TSTM").toUpperCase();
             const color = SPC_COLORS[label] || "#888";
-            if (!f.geometry) return;
+            if (!hasDrawableGeometry(f.geometry)) return;
             L.geoJSON(f, {
               style: {
                 color,
                 weight: 2,
                 fillColor: color,
-                fillOpacity: label === "TSTM" ? 0.1 : 0.25,
+                fillOpacity: label === "TSTM" ? 0.08 : 0.22,
               },
             })
-              .bindPopup(`<strong>SPC Day 1 · ${label}</strong>`)
-              .addTo(map);
+              .bindPopup(
+                `<strong>SPC Day 1 · ${label}</strong><br/>Categorical severe risk area.`
+              )
+              .addTo(dynamicRef.current!);
             outlookCount++;
           });
         }
@@ -215,6 +266,7 @@ export default function StormMap() {
         console.warn("SPC cat failed", e);
       }
 
+      // Tornado probs
       try {
         const res = await fetch(
           "https://www.spc.noaa.gov/products/outlook/day1otlk_torn.nolyr.geojson"
@@ -224,7 +276,7 @@ export default function StormMap() {
           (geo?.features || []).forEach((f: any) => {
             const label = String(f.properties?.LABEL || f.properties?.label || "");
             const color = PROB_COLORS[label] || "#00aa00";
-            if (!f.geometry) return;
+            if (!hasDrawableGeometry(f.geometry)) return;
             L.geoJSON(f, {
               style: {
                 color,
@@ -236,12 +288,14 @@ export default function StormMap() {
             })
               .bindPopup(`<strong>Tornado probability · ${label}%</strong>`)
               .addTo(tornLayerRef.current!);
+            tornCount++;
           });
         }
       } catch (e) {
         console.warn("SPC torn failed", e);
       }
 
+      // Hail probs
       try {
         const res = await fetch(
           "https://www.spc.noaa.gov/products/outlook/day1otlk_hail.nolyr.geojson"
@@ -251,28 +305,30 @@ export default function StormMap() {
           (geo?.features || []).forEach((f: any) => {
             const label = String(f.properties?.LABEL || f.properties?.label || "");
             const color = PROB_COLORS[label] || "#00aa00";
-            if (!f.geometry) return;
+            if (!hasDrawableGeometry(f.geometry)) return;
             L.geoJSON(f, {
               style: {
                 color,
-                weight: 1.5,
+                weight: 2,
                 fillColor: color,
-                fillOpacity: 0.18,
+                fillOpacity: 0.22,
                 dashArray: "2 4",
               },
             })
               .bindPopup(`<strong>Hail probability · ${label}%</strong>`)
               .addTo(hailLayerRef.current!);
+            hailCount++;
           });
         }
       } catch (e) {
         console.warn("SPC hail failed", e);
       }
 
+      // Live NWS alerts — polygons + markers
       try {
         const res = await fetch("https://api.weather.gov/alerts/active", {
           headers: {
-            "User-Agent": "StormIQ",
+            "User-Agent": "StormIQ (https://storm-iq.vercel.app)",
             Accept: "application/geo+json",
           },
         });
@@ -296,53 +352,77 @@ export default function StormMap() {
               event.includes("wind");
 
             if (!interesting) continue;
-            const center = getCentroid(f.geometry);
-            if (!center) continue;
 
-            const [lat, lng] = center;
             const color = severityColor(props.severity);
             const dangerous = isDangerousEvent(eventName);
+            const center = getCentroid(f.geometry);
 
-            const marker = L.circleMarker(center, {
-              radius: 7,
-              color,
-              fillColor: color,
-              fillOpacity: 0.9,
-              weight: 2,
-            }).addTo(map);
-
-            marker.bindPopup(
-              `<div style="min-width:190px;font-family:system-ui;line-height:1.4">
+            const detail = `
+              <div style="min-width:200px;font-family:system-ui;line-height:1.4">
                 <strong>${eventName}</strong><br/>
                 <span style="font-size:12px;color:#333">${props.headline || props.areaDesc || ""}</span><br/>
-                <span style="font-size:11px;color:#555">Severity: ${props.severity || "—"}</span>
-                <div style="margin-top:8px;font-size:11px;color:#666">Tap again or use Route panel →</div>
-              </div>`
-            );
+                <span style="font-size:11px;color:#555">
+                  Severity: ${props.severity || "—"}<br/>
+                  Urgency: ${props.urgency || "—"}<br/>
+                  ${props.expires ? "Expires: " + new Date(props.expires).toLocaleString() : ""}
+                </span>
+                <div style="margin-top:8px;font-size:11px;color:#666">Tap marker for route panel</div>
+              </div>`;
 
-            // Click selects destination for routing panel (works reliably on mobile)
-            marker.on("click", () => {
-              setSelected({
-                lat,
-                lng,
-                title: eventName,
-                dangerous,
+            // Full polygon when geometry exists
+            if (showPolygonsRef.current && hasDrawableGeometry(f.geometry) && f.geometry?.type !== "Point") {
+              try {
+                L.geoJSON(f, {
+                  style: {
+                    color,
+                    weight: event.includes("warning") ? 2.5 : 1.5,
+                    fillColor: color,
+                    fillOpacity: event.includes("warning") ? 0.22 : 0.12,
+                  },
+                })
+                  .bindPopup(detail)
+                  .addTo(dynamicRef.current!);
+              } catch {
+                // skip bad geometry
+              }
+            }
+
+            if (center) {
+              const [lat, lng] = center;
+              const marker = L.circleMarker(center, {
+                radius: event.includes("warning") ? 8 : 6,
+                color,
+                fillColor: color,
+                fillOpacity: 0.95,
+                weight: 2,
+              }).addTo(dynamicRef.current!);
+
+              marker.bindPopup(detail);
+              marker.on("click", () => {
+                setSelected({ lat, lng, title: eventName, dangerous });
               });
-            });
+            }
 
             alertCount++;
-            if (alertCount >= 180) break;
+            if (alertCount >= 200) break;
           }
         }
       } catch (e) {
         console.warn("NWS failed", e);
       }
 
-      setStatus(`LIVE · ${outlookCount} outlook · ${alertCount} alerts`);
-      setTimeout(() => map.invalidateSize(), 100);
+      const hailNote =
+        hailCount === 0 ? " · hail none" : ` · hail ${hailCount}`;
+      const tornNote =
+        tornCount === 0 ? "" : ` · torn ${tornCount}`;
+
+      setStatus(`LIVE · ${outlookCount} outlook · ${alertCount} alerts${tornNote}${hailNote}`);
+      setLastRefresh(new Date().toLocaleTimeString());
+      setTimeout(() => map.invalidateSize(), 80);
     }
 
     loadLayers();
+    const interval = window.setInterval(loadLayers, 180000); // 3 min
 
     if (!document.getElementById("stormiq-city-css")) {
       const style = document.createElement("style");
@@ -363,6 +443,7 @@ export default function StormMap() {
     }
 
     return () => {
+      window.clearInterval(interval);
       window.removeEventListener("resize", resize);
       map.remove();
       mapInstance.current = null;
@@ -505,10 +586,13 @@ export default function StormMap() {
           fontSize: 11,
           color: "#d9ff4a",
           fontWeight: 600,
-          maxWidth: 200,
+          maxWidth: 220,
         }}
       >
-        {routeInfo || status}
+        <div>{routeInfo || status}</div>
+        {lastRefresh && !routeInfo && (
+          <div style={{ fontSize: 9, opacity: 0.7, marginTop: 2 }}>Updated {lastRefresh}</div>
+        )}
       </div>
 
       <div
@@ -531,12 +615,14 @@ export default function StormMap() {
         <button onClick={() => setShowHail((v) => !v)} style={btnStyle(showHail)}>
           {showHail ? "HAIL ON" : "HAIL OFF"}
         </button>
+        <button onClick={() => setShowPolygons((v) => !v)} style={btnStyle(showPolygons)}>
+          {showPolygons ? "POLYGONS ON" : "POLYGONS OFF"}
+        </button>
         <button onClick={() => setShowCities((v) => !v)} style={btnStyle(showCities)}>
           {showCities ? "CITIES ON" : "CITIES OFF"}
         </button>
       </div>
 
-      {/* Route action panel — reliable on mobile */}
       {selected && (
         <div
           style={{
@@ -558,17 +644,9 @@ export default function StormMap() {
           </div>
 
           {selected.dangerous && (
-            <div
-              style={{
-                fontSize: 11,
-                color: "#ff8a8a",
-                marginBottom: 8,
-                lineHeight: 1.4,
-              }}
-            >
-              ⚠ Active danger zone. This route goes toward a warning — not around it.
-              Do not drive into tornado/flash-flood cores. Use official warnings & safe
-              observation practices.
+            <div style={{ fontSize: 11, color: "#ff8a8a", marginBottom: 8, lineHeight: 1.4 }}>
+              ⚠ Active danger zone. Route goes toward a warning — not around it.
+              Do not drive into tornado/flash-flood cores.
             </div>
           )}
 
@@ -629,21 +707,4 @@ export default function StormMap() {
       )}
     </div>
   );
-}
-
-function btnStyle(active: boolean): React.CSSProperties {
-  return {
-    background: active ? "rgba(217,255,74,0.18)" : "rgba(5,9,11,0.88)",
-    border: active
-      ? "1px solid rgba(217,255,74,0.5)"
-      : "1px solid rgba(184,221,225,0.22)",
-    borderRadius: 8,
-    padding: "5px 10px",
-    fontSize: 10,
-    color: active ? "#d9ff4a" : "#8fa6a8",
-    fontWeight: 700,
-    letterSpacing: "0.04em",
-    cursor: "pointer",
-    textAlign: "left",
-  };
 }
