@@ -6,6 +6,7 @@ import StormMap from "../components/StormMap";
 import ModelGuidance from "../components/ModelGuidance";
 import HomeBase from "../components/HomeBase";
 import LookingAhead from "../components/LookingAhead";
+import UpcomingPotential from "../components/UpcomingPotential";
 ---
 
 <Layout title="Storm IQ | Command">
@@ -126,6 +127,8 @@ import LookingAhead from "../components/LookingAhead";
 
   </div>
 
+
+  <UpcomingPotential client:only="react" />
 
   <LookingAhead client:only="react" />
 

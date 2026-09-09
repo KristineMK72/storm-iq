@@ -7,11 +7,22 @@ import {
 } from "../lib/homeBase";
 
 type BoardItem = {
+  id: string;
   name: string;
   score: number;
   status: string;
   state: string;
   event: string;
+  severity?: string;
+  urgency?: string;
+  certainty?: string;
+  headline?: string;
+  description?: string;
+  instruction?: string;
+  areaDesc?: string;
+  onset?: string;
+  expires?: string;
+  senderName?: string;
   lat?: number;
   lng?: number;
   etaMin?: number;
@@ -71,12 +82,10 @@ function getCentroid(geometry: any): [number, number] | null {
   return n ? [lat / n, lng / n] : null;
 }
 
-/** Contiguous US rough bounds (excludes HI, AK, territories) */
 function isContiguousUS(lat?: number, lng?: number, areaDesc?: string, event?: string): boolean {
   const e = (event || "").toLowerCase();
   const a = (areaDesc || "").toLowerCase();
 
-  // Explicit exclusions
   if (
     a.includes("hawaii") ||
     a.includes("kauai") ||
@@ -86,7 +95,6 @@ function isContiguousUS(lat?: number, lng?: number, areaDesc?: string, event?: s
     a.includes("alaska") ||
     a.includes("puerto rico") ||
     a.includes("guam") ||
-    a.includes("american samoa") ||
     a.includes("virgin islands") ||
     /\bhi\b/.test(a) ||
     /\bak\b/.test(a)
@@ -94,13 +102,10 @@ function isContiguousUS(lat?: number, lng?: number, areaDesc?: string, event?: s
     return false;
   }
 
-  // Pure tropical products outside CONUS often dominate — keep only if lat/lng is CONUS
   if (lat != null && lng != null) {
-    // Contiguous US approximate box
     if (lat < 24.5 || lat > 49.5 || lng < -125 || lng > -66.5) return false;
   }
 
-  // If no geometry, still allow CONUS-sounding severe (not hurricane/tropical alone)
   if (lat == null && (e.includes("hurricane") || e.includes("tropical"))) {
     return false;
   }
@@ -108,11 +113,21 @@ function isContiguousUS(lat?: number, lng?: number, areaDesc?: string, event?: s
   return true;
 }
 
+function fmtTime(iso?: string) {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toLocaleString();
+  } catch {
+    return iso;
+  }
+}
+
 export default function TargetBoard() {
   const [items, setItems] = useState<BoardItem[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "empty" | "error">("loading");
   const [home, setHome] = useState<HomeBase | null>(null);
   const [etaStatus, setEtaStatus] = useState<"idle" | "calc" | "done">("idle");
+  const [openId, setOpenId] = useState<string | null>(null);
 
   useEffect(() => {
     setHome(loadHomeBase());
@@ -154,7 +169,6 @@ export default function TargetBoard() {
           const lat = center?.[0];
           const lng = center?.[1];
 
-          // Chase-focused: contiguous US only
           if (!isContiguousUS(lat, lng, p.areaDesc, event)) continue;
 
           let statusLabel = "ACTIVE";
@@ -162,11 +176,22 @@ export default function TargetBoard() {
           else if (event.toLowerCase().includes("watch")) statusLabel = "WATCH";
 
           scored.push({
+            id: f.id || `${event}-${p.areaDesc}-${score}`,
             name: shortArea(p.areaDesc),
             score,
             status: statusLabel,
             state: guessState(p.areaDesc),
             event,
+            severity,
+            urgency: p.urgency,
+            certainty: p.certainty,
+            headline: p.headline,
+            description: p.description,
+            instruction: p.instruction,
+            areaDesc: p.areaDesc,
+            onset: p.onset || p.effective,
+            expires: p.expires,
+            senderName: p.senderName,
             lat,
             lng,
           });
@@ -242,7 +267,7 @@ export default function TargetBoard() {
 
       {!home && status === "ready" && (
         <p className="small muted" style={{ marginTop: 4, marginBottom: 8 }}>
-          Set Home base above to see drive times.
+          Set Home base above to see drive times. Tap a target for full warning detail.
         </p>
       )}
 
@@ -256,30 +281,190 @@ export default function TargetBoard() {
         </p>
       )}
 
-      {items.map((item, index) => (
-        <div className="target-row" key={item.name + index}>
-          <div className="rank">0{index + 1}</div>
-          <div>
-            <strong>{item.name}</strong>
-            <div className="small muted">
-              {item.state} · {item.event}
-              {item.etaMin != null ? (
-                <>
-                  {" "}·{" "}
-                  <span style={{ color: "var(--lime)" }}>~{formatDuration(item.etaMin)}</span>
-                  {" "}· {item.etaMiles} mi
-                </>
-              ) : home && item.lat == null ? (
-                <> · no location</>
-              ) : null}
-            </div>
+      {items.map((item, index) => {
+        const open = openId === item.id;
+        return (
+          <div key={item.id}>
+            <button
+              type="button"
+              onClick={() => setOpenId(open ? null : item.id)}
+              className="target-row"
+              style={{
+                width: "100%",
+                background: open ? "rgba(217,255,74,0.04)" : "transparent",
+                border: "none",
+                borderTop: "1px solid var(--line)",
+                color: "inherit",
+                cursor: "pointer",
+                textAlign: "left",
+                padding: "13px 0",
+              }}
+            >
+              <div className="rank">0{index + 1}</div>
+              <div>
+                <strong>{item.name}</strong>
+                <div className="small muted">
+                  {item.state} · {item.event}
+                  {item.etaMin != null ? (
+                    <>
+                      {" "}·{" "}
+                      <span style={{ color: "var(--lime)" }}>
+                        ~{formatDuration(item.etaMin)}
+                      </span>
+                      {" "}· {item.etaMiles} mi
+                    </>
+                  ) : null}
+                  <span style={{ opacity: 0.7 }}> · {open ? "hide detail" : "tap for detail"}</span>
+                </div>
+              </div>
+              <div className={`badge ${item.status === "WARNING" ? "warn" : ""}`}>
+                {item.status}
+              </div>
+              <div className="score-num">{item.score}</div>
+            </button>
+
+            {open && (
+              <div
+                style={{
+                  margin: "0 0 12px",
+                  padding: "14px",
+                  borderRadius: 12,
+                  border: "1px solid var(--line)",
+                  background: "rgba(0,0,0,0.28)",
+                  fontSize: 13,
+                  lineHeight: 1.5,
+                }}
+              >
+                {item.headline && (
+                  <div style={{ fontWeight: 700, marginBottom: 8, color: "var(--text)" }}>
+                    {item.headline}
+                  </div>
+                )}
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+                    gap: 8,
+                    marginBottom: 12,
+                    fontSize: 12,
+                  }}
+                >
+                  <div>
+                    <div className="small muted">Severity</div>
+                    <strong>{item.severity || "—"}</strong>
+                  </div>
+                  <div>
+                    <div className="small muted">Urgency</div>
+                    <strong>{item.urgency || "—"}</strong>
+                  </div>
+                  <div>
+                    <div className="small muted">Certainty</div>
+                    <strong>{item.certainty || "—"}</strong>
+                  </div>
+                  <div>
+                    <div className="small muted">Office</div>
+                    <strong style={{ fontSize: 11 }}>{item.senderName || "NWS"}</strong>
+                  </div>
+                </div>
+
+                <div className="small muted" style={{ marginBottom: 4 }}>
+                  Area
+                </div>
+                <div style={{ marginBottom: 10, color: "var(--muted)", fontSize: 12 }}>
+                  {item.areaDesc || "—"}
+                </div>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 8,
+                    marginBottom: 12,
+                    fontSize: 12,
+                  }}
+                >
+                  <div>
+                    <div className="small muted">Onset</div>
+                    <strong>{fmtTime(item.onset)}</strong>
+                  </div>
+                  <div>
+                    <div className="small muted">Expires</div>
+                    <strong>{fmtTime(item.expires)}</strong>
+                  </div>
+                </div>
+
+                {item.description && (
+                  <>
+                    <div className="small muted" style={{ marginBottom: 4 }}>
+                      Warning text
+                    </div>
+                    <pre
+                      style={{
+                        whiteSpace: "pre-wrap",
+                        fontFamily: "inherit",
+                        fontSize: 12,
+                        color: "var(--muted)",
+                        margin: "0 0 12px",
+                        maxHeight: 220,
+                        overflow: "auto",
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      {item.description}
+                    </pre>
+                  </>
+                )}
+
+                {item.instruction && (
+                  <>
+                    <div className="small muted" style={{ marginBottom: 4 }}>
+                      Instructions
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: "#cdd9b0",
+                        background: "rgba(217,255,74,0.06)",
+                        border: "1px solid rgba(217,255,74,0.18)",
+                        borderRadius: 8,
+                        padding: 10,
+                        marginBottom: 12,
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      {item.instruction}
+                    </div>
+                  </>
+                )}
+
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <a
+                    href="/map"
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: "var(--cyan)",
+                    }}
+                  >
+                    Open map →
+                  </a>
+                  <a
+                    href="/alerts"
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: "var(--cyan)",
+                    }}
+                  >
+                    All alerts →
+                  </a>
+                </div>
+              </div>
+            )}
           </div>
-          <div className={`badge ${item.status === "WARNING" ? "warn" : ""}`}>
-            {item.status}
-          </div>
-          <div className="score-num">{item.score}</div>
-        </div>
-      ))}
+        );
+      })}
 
       {home && etaStatus === "done" && items.some((i) => i.etaMin != null) && (
         <p className="small muted" style={{ marginTop: 10 }}>

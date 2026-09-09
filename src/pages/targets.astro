@@ -3,7 +3,7 @@ import Layout from "../layouts/Layout.astro";
 import HomeBase from "../components/HomeBase";
 import TargetBoard from "../components/TargetBoard";
 import ChaseScore from "../components/ChaseScore";
-import LookingAhead from "../components/LookingAhead";
+import UpcomingPotential from "../components/UpcomingPotential";
 ---
 
 <Layout title="Storm IQ | Targets">
@@ -21,6 +21,7 @@ import LookingAhead from "../components/LookingAhead";
     <p>
       Ranked live threats across the contiguous U.S.,
       with optional drive-time estimates from your home base.
+      Tap any target for the full official warning text.
       Official NWS warnings always take priority.
     </p>
 
@@ -33,6 +34,6 @@ import LookingAhead from "../components/LookingAhead";
     <TargetBoard client:only="react" />
   </div>
 
-  <LookingAhead client:only="react" />
+  <UpcomingPotential client:only="react" />
 
 </Layout>
