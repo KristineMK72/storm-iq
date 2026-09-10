@@ -1,6 +1,6 @@
 ---
 import Layout from "../layouts/Layout.astro";
-import StormMap from "../components/StormMap";
+import ChaseModeMap from "../components/ChaseModeMap";
 import OutlookDiscussion from "../components/OutlookDiscussion";
 import FutureOutlookMap from "../components/FutureOutlookMap";
 ---
@@ -19,7 +19,8 @@ import FutureOutlookMap from "../components/FutureOutlookMap";
 
     <p>
       Live National Weather Service alerts, radar, and SPC Day 1 risk areas.
-      Scroll down for a separate map of potential future target areas (Day 2 / Day 3).
+      Use <strong style="color:var(--lime)">Chase Mode</strong> for a taller,
+      field-ready map with near-me focus when home base is set.
     </p>
 
   </div>
@@ -35,9 +36,7 @@ import FutureOutlookMap from "../components/FutureOutlookMap";
       <span class="small muted">DAY 1 + ALERTS</span>
     </div>
 
-    <div class="map-shell">
-      <StormMap client:only="react" />
-    </div>
+    <ChaseModeMap client:only="react" />
 
   </div>
 
@@ -74,8 +73,9 @@ import FutureOutlookMap from "../components/FutureOutlookMap";
       LIVE DATA:
     </strong>
 
-    Top map = radar, Day 1 outlook, alert polygons/dots.
-    Bottom map = Day 2 / Day 3 categorical risk for future targeting.
+    Chase Mode = tall map + near-me zoom from your home base.
+    Top map = radar, Day 1 outlook, alert polygons.
+    Bottom map = Day 2 / Day 3 future targets.
     Official NWS warnings always take priority.
 
   </div>
