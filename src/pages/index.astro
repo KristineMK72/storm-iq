@@ -15,6 +15,7 @@ import ChaseWatch from "../components/ChaseWatch";
 import MesoLinks from "../components/MesoLinks";
 import CarFieldGuide from "../components/CarFieldGuide";
 import ThreatStrip from "../components/ThreatStrip";
+import QuietDay from "../components/QuietDay";
 ---
 
 <Layout title="Storm IQ | Command">
@@ -47,6 +48,7 @@ import ThreatStrip from "../components/ThreatStrip";
   </section>
 
   <ThreatStrip client:only="react" />
+  <QuietDay client:only="react" />
   <GoNoGo client:only="react" />
   <HomeBase client:only="react" />
 
@@ -118,7 +120,7 @@ import ThreatStrip from "../components/ThreatStrip";
 
   <UpcomingPotential client:only="react" />
 
-  <div class="card" style="margin-top:18px">
+  <div class="card" style="margin-top:18px" id="future-targets">
     <div class="section-title">
       <div>
         <div class="eyebrow">Looking ahead</div>
