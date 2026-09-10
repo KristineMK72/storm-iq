@@ -28,10 +28,6 @@ export default function ChaseModeMap() {
       } catch {
         // ignore
       }
-      // Notify map to near-me zoom
-      window.dispatchEvent(
-        new CustomEvent("stormiq-chase-mode", { detail: { active: next } })
-      );
       return next;
     });
   }
@@ -47,8 +43,8 @@ export default function ChaseModeMap() {
           <div className="small muted" style={{ marginTop: 2 }}>
             {chase
               ? homeSet
-                ? "Near-me focus · tall map · auto-refresh live"
-                : "Tall map on — set Home base for near-me zoom"
+                ? "Near-me focus · tall map · live layers"
+                : "Tall map on — set Home base on Command for near-me zoom"
               : "Flip on for a bigger field-ready map"}
           </div>
         </div>
@@ -72,7 +68,7 @@ export default function ChaseModeMap() {
       )}
 
       <div className={chase ? "map-shell map-shell-chase" : "map-shell"}>
-        <StormMap client:only="react" chaseMode={chase} />
+        <StormMap chaseMode={chase} />
       </div>
     </div>
   );
