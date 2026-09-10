@@ -9,10 +9,19 @@ type DayBlock = {
 function extractSummary(raw: string): string {
   let text = raw.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 
+  if (text.includes("<pre")) {
+    const pre = text.match(/<pre[^>]*>([\s\S]*?)<\/pre>/i);
+    if (pre?.[1]) {
+      text = pre[1]
+        .replace(/<[^>]+>/g, "")
+        .replace(/&nbsp;/g, " ")
+        .replace(/&amp;/g, "&");
+    }
+  }
+
   const sumIdx = text.search(/\.\.\.SUMMARY\.\.\./i);
   if (sumIdx >= 0) text = text.slice(sumIdx);
 
-  // Prefer the first paragraph after SUMMARY
   const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
   const useful: string[] = [];
 
@@ -28,14 +37,18 @@ function extractSummary(raw: string): string {
   return out || text.slice(0, 400) + "…";
 }
 
-async function fetchDay(url: string): Promise<string | null> {
-  try {
-    const res = await fetch(url, { mode: "cors", cache: "no-cache" });
-    if (!res.ok) return null;
-    return extractSummary(await res.text());
-  } catch {
-    return null;
+async function fetchDay(txtUrl: string, htmlUrl: string): Promise<string | null> {
+  for (const url of [txtUrl, htmlUrl]) {
+    try {
+      const res = await fetch(url, { mode: "cors", cache: "no-cache" });
+      if (!res.ok) continue;
+      const summary = extractSummary(await res.text());
+      if (summary.length > 40) return summary;
+    } catch {
+      // try next
+    }
   }
+  return null;
 }
 
 export default function LookingAhead() {
@@ -45,8 +58,14 @@ export default function LookingAhead() {
   useEffect(() => {
     async function load() {
       const [d2, d3] = await Promise.all([
-        fetchDay("https://www.spc.noaa.gov/products/outlook/day2otlk.txt"),
-        fetchDay("https://www.spc.noaa.gov/products/outlook/day3otlk.txt"),
+        fetchDay(
+          "https://www.spc.noaa.gov/products/outlook/day2otlk.txt",
+          "https://www.spc.noaa.gov/products/outlook/day2otlk.html"
+        ),
+        fetchDay(
+          "https://www.spc.noaa.gov/products/outlook/day3otlk.txt",
+          "https://www.spc.noaa.gov/products/outlook/day3otlk.html"
+        ),
       ]);
 
       const blocks: DayBlock[] = [];
@@ -66,7 +85,6 @@ export default function LookingAhead() {
         });
       }
 
-      // Always include Day 4–8 link
       blocks.push({
         label: "Day 4–8",
         summary:
@@ -75,7 +93,7 @@ export default function LookingAhead() {
       });
 
       setDays(blocks);
-      setStatus(d2 || d3 ? "ready" : blocks.length ? "ready" : "error");
+      setStatus(d2 || d3 ? "ready" : "ready");
     }
 
     load();
@@ -103,11 +121,7 @@ export default function LookingAhead() {
       )}
 
       {days.map((d) => (
-        <div
-          key={d.label}
-          className="alert"
-          style={{ marginBottom: 10 }}
-        >
+        <div key={d.label} className="alert" style={{ marginBottom: 10 }}>
           <strong>{d.label}</strong>
           <p style={{ marginTop: 4 }}>{d.summary}</p>
           <a

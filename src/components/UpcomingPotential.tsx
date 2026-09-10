@@ -10,6 +10,17 @@ type Block = {
 
 function extractSummary(raw: string): string {
   let text = raw.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+
+  if (text.includes("<pre")) {
+    const pre = text.match(/<pre[^>]*>([\s\S]*?)<\/pre>/i);
+    if (pre?.[1]) {
+      text = pre[1]
+        .replace(/<[^>]+>/g, "")
+        .replace(/&nbsp;/g, " ")
+        .replace(/&amp;/g, "&");
+    }
+  }
+
   const sumIdx = text.search(/\.\.\.SUMMARY\.\.\./i);
   if (sumIdx >= 0) text = text.slice(sumIdx);
 
@@ -31,14 +42,18 @@ function extractSummary(raw: string): string {
   return out || text.slice(0, 420) + "…";
 }
 
-async function fetchText(url: string): Promise<string | null> {
-  try {
-    const res = await fetch(url, { mode: "cors", cache: "no-cache" });
-    if (!res.ok) return null;
-    return extractSummary(await res.text());
-  } catch {
-    return null;
+async function fetchText(txtUrl: string, htmlUrl: string): Promise<string | null> {
+  for (const url of [txtUrl, htmlUrl]) {
+    try {
+      const res = await fetch(url, { mode: "cors", cache: "no-cache" });
+      if (!res.ok) continue;
+      const summary = extractSummary(await res.text());
+      if (summary.length > 40) return summary;
+    } catch {
+      // try next
+    }
   }
+  return null;
 }
 
 export default function UpcomingPotential() {
@@ -48,9 +63,18 @@ export default function UpcomingPotential() {
   useEffect(() => {
     async function load() {
       const [d1, d2, d3] = await Promise.all([
-        fetchText("https://www.spc.noaa.gov/products/outlook/day1otlk.txt"),
-        fetchText("https://www.spc.noaa.gov/products/outlook/day2otlk.txt"),
-        fetchText("https://www.spc.noaa.gov/products/outlook/day3otlk.txt"),
+        fetchText(
+          "https://www.spc.noaa.gov/products/outlook/day1otlk.txt",
+          "https://www.spc.noaa.gov/products/outlook/day1otlk.html"
+        ),
+        fetchText(
+          "https://www.spc.noaa.gov/products/outlook/day2otlk.txt",
+          "https://www.spc.noaa.gov/products/outlook/day2otlk.html"
+        ),
+        fetchText(
+          "https://www.spc.noaa.gov/products/outlook/day3otlk.txt",
+          "https://www.spc.noaa.gov/products/outlook/day3otlk.html"
+        ),
       ]);
 
       const next: Block[] = [];
@@ -63,7 +87,16 @@ export default function UpcomingPotential() {
           summary: d1,
           href: "https://www.spc.noaa.gov/products/outlook/day1otlk.html",
         });
+      } else {
+        next.push({
+          key: "d1",
+          label: "Today / tonight",
+          window: "Day 1",
+          summary: "Summary text couldn’t load in-browser. Open the full Day 1 product on SPC.",
+          href: "https://www.spc.noaa.gov/products/outlook/day1otlk.html",
+        });
       }
+
       if (d2) {
         next.push({
           key: "d2",
@@ -72,13 +105,30 @@ export default function UpcomingPotential() {
           summary: d2,
           href: "https://www.spc.noaa.gov/products/outlook/day2otlk.html",
         });
+      } else {
+        next.push({
+          key: "d2",
+          label: "Tomorrow",
+          window: "Day 2",
+          summary: "Open the full Day 2 product on SPC for the official discussion.",
+          href: "https://www.spc.noaa.gov/products/outlook/day2otlk.html",
+        });
       }
+
       if (d3) {
         next.push({
           key: "d3",
           label: "Day after",
           window: "Day 3",
           summary: d3,
+          href: "https://www.spc.noaa.gov/products/outlook/day3otlk.html",
+        });
+      } else {
+        next.push({
+          key: "d3",
+          label: "Day after",
+          window: "Day 3",
+          summary: "Open the full Day 3 product on SPC for the official discussion.",
           href: "https://www.spc.noaa.gov/products/outlook/day3otlk.html",
         });
       }

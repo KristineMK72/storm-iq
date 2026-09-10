@@ -2,31 +2,53 @@ import { useEffect, useState } from "react";
 
 type DayKey = "day1" | "day2" | "day3" | "day48";
 
-const SOURCES: Record<DayKey, { label: string; url: string; isText: boolean }> = {
+const SOURCES: Record<
+  DayKey,
+  { label: string; txt?: string; html: string; isText: boolean }
+> = {
   day1: {
     label: "Day 1",
-    url: "https://www.spc.noaa.gov/products/outlook/day1otlk.txt",
+    txt: "https://www.spc.noaa.gov/products/outlook/day1otlk.txt",
+    html: "https://www.spc.noaa.gov/products/outlook/day1otlk.html",
     isText: true,
   },
   day2: {
     label: "Day 2",
-    url: "https://www.spc.noaa.gov/products/outlook/day2otlk.txt",
+    txt: "https://www.spc.noaa.gov/products/outlook/day2otlk.txt",
+    html: "https://www.spc.noaa.gov/products/outlook/day2otlk.html",
     isText: true,
   },
   day3: {
     label: "Day 3",
-    url: "https://www.spc.noaa.gov/products/outlook/day3otlk.txt",
+    txt: "https://www.spc.noaa.gov/products/outlook/day3otlk.txt",
+    html: "https://www.spc.noaa.gov/products/outlook/day3otlk.html",
     isText: true,
   },
   day48: {
     label: "Day 4–8",
-    url: "https://www.spc.noaa.gov/products/exper/day4-8/",
+    html: "https://www.spc.noaa.gov/products/exper/day4-8/",
     isText: false,
   },
 };
 
 function cleanDiscussion(raw: string): string {
   let text = raw.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+
+  // Strip basic HTML if we got a page
+  if (text.includes("<") && text.includes(">")) {
+    const pre = text.match(/<pre[^>]*>([\s\S]*?)<\/pre>/i);
+    if (pre?.[1]) {
+      text = pre[1]
+        .replace(/<[^>]+>/g, "")
+        .replace(/&nbsp;/g, " ")
+        .replace(/&amp;/g, "&")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&quot;/g, '"');
+    }
+  }
+
+  text = text.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 
   const summaryIdx = text.search(/\.\.\.SUMMARY\.\.\./i);
   const discussionIdx = text.search(/\.\.\.DISCUSSION\.\.\./i);
@@ -38,9 +60,28 @@ function cleanDiscussion(raw: string): string {
   return text;
 }
 
+async function fetchDiscussion(day: DayKey): Promise<string> {
+  const src = SOURCES[day];
+  const urls = [src.txt, src.html].filter(Boolean) as string[];
+
+  let lastErr: unknown;
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, { mode: "cors", cache: "no-cache" });
+      if (!res.ok) continue;
+      const raw = await res.text();
+      const cleaned = cleanDiscussion(raw);
+      if (cleaned.length > 40) return cleaned;
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr || new Error("Could not load discussion");
+}
+
 export default function OutlookDiscussion() {
   const [active, setActive] = useState<DayKey>("day1");
-  const [cache, setCache] = useState<Partial<Record<DayKey, string>>>( {} );
+  const [cache, setCache] = useState<Partial<Record<DayKey, string>>>({});
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
 
   useEffect(() => {
@@ -52,21 +93,16 @@ export default function OutlookDiscussion() {
         return;
       }
 
-      const src = SOURCES[day];
-      if (!src.isText) {
+      if (!SOURCES[day].isText) {
         setStatus("ready");
         return;
       }
 
       setStatus("loading");
       try {
-        const res = await fetch(src.url, {
-          headers: { "User-Agent": "StormIQ (https://storm-iq.vercel.app)" },
-        });
-        if (!res.ok) throw new Error("Failed");
-        const raw = await res.text();
+        const text = await fetchDiscussion(day);
         if (cancelled) return;
-        setCache((prev) => ({ ...prev, [day]: cleanDiscussion(raw) }));
+        setCache((prev) => ({ ...prev, [day]: text }));
         setStatus("ready");
       } catch {
         if (!cancelled) setStatus("error");
@@ -77,6 +113,7 @@ export default function OutlookDiscussion() {
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active]);
 
   const tabs: DayKey[] = ["day1", "day2", "day3", "day48"];
@@ -93,7 +130,6 @@ export default function OutlookDiscussion() {
         </span>
       </div>
 
-      {/* Day tabs */}
       <div
         style={{
           display: "flex",
@@ -163,17 +199,30 @@ export default function OutlookDiscussion() {
           )}
 
           {status === "error" && (
-            <p className="muted">
-              Could not load discussion.{" "}
+            <div style={{ marginBottom: 8 }}>
+              <p className="muted" style={{ marginBottom: 10 }}>
+                Couldn’t load the text in-browser (SPC sometimes blocks direct
+                fetches). Use the official product:
+              </p>
               <a
-                href={SOURCES[active].url.replace(".txt", ".html")}
+                href={SOURCES[active].html}
                 target="_blank"
                 rel="noopener"
-                style={{ color: "var(--cyan)" }}
+                style={{
+                  display: "inline-block",
+                  background: "rgba(82,224,208,0.12)",
+                  border: "1px solid rgba(82,224,208,0.35)",
+                  color: "var(--cyan)",
+                  borderRadius: 8,
+                  padding: "8px 12px",
+                  fontWeight: 700,
+                  fontSize: 13,
+                  textDecoration: "none",
+                }}
               >
-                View on SPC →
+                Open {SOURCES[active].label} discussion on SPC →
               </a>
-            </p>
+            </div>
           )}
 
           {status === "ready" && cache[active] && (
@@ -200,13 +249,7 @@ export default function OutlookDiscussion() {
           <p className="small muted" style={{ marginTop: 12 }}>
             Source:{" "}
             <a
-              href={
-                active === "day1"
-                  ? "https://www.spc.noaa.gov/products/outlook/day1otlk.html"
-                  : active === "day2"
-                  ? "https://www.spc.noaa.gov/products/outlook/day2otlk.html"
-                  : "https://www.spc.noaa.gov/products/outlook/day3otlk.html"
-              }
+              href={SOURCES[active].html}
               target="_blank"
               rel="noopener"
               style={{ color: "var(--cyan)" }}
