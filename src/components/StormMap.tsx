@@ -280,6 +280,17 @@ export default function StormMap({ chaseMode = false }: { chaseMode?: boolean })
     const map = mapInstance.current;
     const dest = selectedRef.current;
     if (!map || !dest) return;
+    if (dest.dangerous) {
+      const ok = window.confirm(
+        "This target is inside/near an active danger warning.\n\n" +
+          "Storm IQ cannot auto-route around storm cores.\n" +
+          "Only continue if you have a safe observation plan.\n\nProceed with route line?"
+      );
+      if (!ok) {
+        setRouteInfo("Route cancelled — stay out of the core");
+        return;
+      }
+    }
     const home = loadHomeBase();
     if (!home) { setRouteInfo("Set Home base on Command page first"); return; }
     if (routeLayerRef.current) { map.removeLayer(routeLayerRef.current); routeLayerRef.current = null; }
@@ -390,7 +401,7 @@ export default function StormMap({ chaseMode = false }: { chaseMode?: boolean })
         <div style={{ position: "absolute", left: 12, right: 12, bottom: 16, zIndex: 1100, background: "rgba(5,9,11,0.94)", border: selected.dangerous ? "1px solid rgba(255,92,92,0.55)" : "1px solid rgba(217,255,74,0.35)", borderRadius: 12, padding: "12px 14px" }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: "#edf8f7", marginBottom: 4 }}>{selected.title}</div>
           {selected.dangerous ? (
-            <div style={{ fontSize: 11, color: "#ff8a8a", marginBottom: 8, lineHeight: 1.4 }}>⚠ Active danger zone. Route goes toward a warning — not around it.</div>
+            <div style={{ fontSize: 11, color: "#ff8a8a", marginBottom: 8, lineHeight: 1.4 }}>⚠ Danger zone. Route is toward the warning — Storm IQ does not auto-avoid storm cores. Confirm before SHOW ROUTE.</div>
           ) : (
             <div style={{ fontSize: 11, color: "#8fa6a8", marginBottom: 8 }}>Routes are point-to-point only — they do not auto-avoid storm cores.</div>
           )}
