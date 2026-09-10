@@ -44,7 +44,7 @@ function loadSeen(): Set<string> {
 
 function saveSeen(seen: Set<string>) {
   try {
-    localStorage.setItem(SEEN_KEY, JSON.stringify([...seen].slice(-200));
+    localStorage.setItem(SEEN_KEY, JSON.stringify([...seen].slice(-200)));
   } catch {
     // ignore
   }
@@ -85,7 +85,6 @@ export default function FieldAlerts() {
 
     seenRef.current = loadSeen();
 
-    // PWA install prompt capture
     const onBip = (e: Event) => {
       e.preventDefault();
       deferredPrompt.current = e;
@@ -93,11 +92,8 @@ export default function FieldAlerts() {
     };
     window.addEventListener("beforeinstallprompt", onBip);
 
-    // Register service worker
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => {
-        // ignore
-      });
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
     }
 
     return () => window.removeEventListener("beforeinstallprompt", onBip);
@@ -149,7 +145,6 @@ export default function FieldAlerts() {
             continue;
           }
 
-          // New nearby priority warning
           seenRef.current.add(id);
           newCount++;
 
@@ -169,7 +164,7 @@ export default function FieldAlerts() {
                 new Notification(title, { body, tag: id });
               }
             } catch {
-              // ignore notification errors
+              // ignore
             }
           }
         }
