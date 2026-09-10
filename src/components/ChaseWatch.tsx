@@ -8,12 +8,7 @@ const SEEN_OUTLOOK_KEY = "stormiq-seen-outlook";
 const SEEN_WARN_KEY = "stormiq-seen-warn-sound";
 
 const RISK_RANK: Record<string, number> = {
-  TSTM: 1,
-  MRGL: 2,
-  SLGT: 3,
-  ENH: 4,
-  MDT: 5,
-  HIGH: 6,
+  TSTM: 1, MRGL: 2, SLGT: 3, ENH: 4, MDT: 5, HIGH: 6,
 };
 
 function getCentroid(geometry: any): [number, number] | null {
@@ -48,13 +43,13 @@ function nearAnyZone(lat: number, lng: number): boolean {
     ...regions.map((r) => ({ lat: r.lat, lng: r.lng, r: r.radiusMi })),
     ...(home ? [{ lat: home.lat, lng: home.lng, r: 150 }] : []),
   ];
-  if (!points.length) return true; // national watch if no zones
+  if (!points.length) return true;
   return points.some((p) => milesBetween(p, { lat, lng }) <= p.r);
 }
 
 export default function ChaseWatch() {
   const [soundOn, setSoundOn] = useState(false);
-  const [status, setStatus] = useState("Sound off");
+  const [status, setStatus] = useState("Sound off — tap enable below");
   const armed = useRef(false);
 
   useEffect(() => {
@@ -72,7 +67,6 @@ export default function ChaseWatch() {
 
     async function checkOutlooks() {
       try {
-        // Day 1 + Day 2 categorical
         const urls = [
           "https://www.spc.noaa.gov/products/outlook/day1otlk_cat.nolyr.geojson",
           "https://www.spc.noaa.gov/products/outlook/day2otlk_cat.nolyr.geojson",
@@ -80,7 +74,6 @@ export default function ChaseWatch() {
 
         const seenRaw = localStorage.getItem(SEEN_OUTLOOK_KEY);
         const seen = new Set<string>(seenRaw ? JSON.parse(seenRaw) : []);
-
         let bestNew: { key: string; label: string; day: string } | null = null;
 
         for (let i = 0; i < urls.length; i++) {
@@ -92,7 +85,6 @@ export default function ChaseWatch() {
           for (const f of geo?.features || []) {
             const label = String(f.properties?.LABEL || f.properties?.label || "").toUpperCase();
             const rank = RISK_RANK[label] || 0;
-            // "Good chase" = Enhanced or higher
             if (rank < 4) continue;
 
             const center = getCentroid(f.geometry);
@@ -109,9 +101,7 @@ export default function ChaseWatch() {
           }
         }
 
-        // Cap seen set
-        const arr = [...seen].slice(-80);
-        localStorage.setItem(SEEN_OUTLOOK_KEY, JSON.stringify(arr));
+        localStorage.setItem(SEEN_OUTLOOK_KEY, JSON.stringify([...seen].slice(-80)));
 
         if (bestNew && armed.current && !cancelled) {
           playChaseOutlookSound();
@@ -191,7 +181,6 @@ export default function ChaseWatch() {
       }
     }
 
-    // Arm after first pass so we don't blast on page load
     checkOutlooks().then(() => {
       armed.current = true;
     });
@@ -216,7 +205,6 @@ export default function ChaseWatch() {
       // ignore
     }
     if (next) {
-      // Unlock audio on user gesture
       playChaseOutlookSound();
       setStatus("Sounds on · watching outlooks + near-me warnings");
       if ("Notification" in window && Notification.permission === "default") {
@@ -227,25 +215,9 @@ export default function ChaseWatch() {
     }
   }
 
+  // Nested in parent card — compact
   return (
-    <div
-      className="card"
-      style={{ marginBottom: 18, borderColor: soundOn ? "rgba(217,255,74,0.28)" : undefined }}
-    >
-      <div className="section-title">
-        <div>
-          <div className="eyebrow">Audio watch</div>
-          <h2>Chase alert sounds</h2>
-        </div>
-        <span className="small muted">{soundOn ? "ARMED" : "OFF"}</span>
-      </div>
-
-      <p className="muted" style={{ fontSize: 13, lineHeight: 1.55, margin: "0 0 12px" }}>
-        Soft tone when <strong style={{ color: "var(--text)" }}>Day 1/2 Enhanced+</strong> shows
-        near your saved regions (or nationally if none saved). Urgent tone for new tornado /
-        severe / flash-flood warnings near home base.
-      </p>
-
+    <div style={{ marginTop: 4 }}>
       <button
         type="button"
         className={soundOn ? "chase-btn chase-btn-on" : "chase-btn"}
@@ -254,7 +226,7 @@ export default function ChaseWatch() {
         {soundOn ? "SOUNDS ON · TAP TO MUTE" : "ENABLE CHASE SOUNDS"}
       </button>
 
-      <p className="small muted" style={{ marginTop: 10 }}>
+      <p className="small muted" style={{ marginTop: 10, lineHeight: 1.5 }}>
         {status}
       </p>
     </div>

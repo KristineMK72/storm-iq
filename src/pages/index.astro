@@ -74,9 +74,35 @@ import ChaseWatch from "../components/ChaseWatch";
 
   <HomeBase client:only="react" />
 
-  <ChaseRegions client:only="react" />
+  <!-- Always-visible shells so these never look "missing" before React loads -->
+  <div class="card" style="margin-bottom:18px;border-color:rgba(82,224,208,0.28)">
+    <div class="section-title">
+      <div>
+        <div class="eyebrow">Your zones</div>
+        <h2>Saved chase regions</h2>
+      </div>
+      <span class="small muted">PIN AREAS</span>
+    </div>
+    <p class="muted" style="font-size:13px;line-height:1.55;margin:0 0 10px">
+      Controls load below — pin Tornado Alley, Dixie, High Plains, or your home base.
+    </p>
+    <ChaseRegions client:only="react" />
+  </div>
 
-  <ChaseWatch client:only="react" />
+  <div class="card" style="margin-bottom:18px;border-color:rgba(217,255,74,0.3)">
+    <div class="section-title">
+      <div>
+        <div class="eyebrow">Audio watch</div>
+        <h2>Chase alert sounds</h2>
+      </div>
+      <span class="small muted">NEW</span>
+    </div>
+    <p class="muted" style="font-size:13px;line-height:1.55;margin:0 0 10px">
+      Look for <strong style="color:var(--lime)">ENABLE CHASE SOUNDS</strong> —
+      soft tone for Day 1/2 Enhanced+ near your zones, urgent tone for near-me warnings.
+    </p>
+    <ChaseWatch client:only="react" />
+  </div>
 
   <div class="card" style="margin-bottom:18px;border-color:rgba(217,255,74,0.25)">
     <div class="section-title">

@@ -46,21 +46,9 @@ export default function ChaseRegions() {
     setName("");
   }
 
+  // Nested inside parent card on Command — compact controls only
   return (
-    <div className="card" style={{ marginBottom: 18 }}>
-      <div className="section-title">
-        <div>
-          <div className="eyebrow">Your zones</div>
-          <h2>Saved chase regions</h2>
-        </div>
-        <span className="small muted">{regions.length}/6</span>
-      </div>
-
-      <p className="muted" style={{ fontSize: 13, lineHeight: 1.55, margin: "0 0 12px" }}>
-        Pin areas you care about. Chase outlook sounds can key off these zones
-        when SPC highlights enhanced+ risk nearby.
-      </p>
-
+    <div style={{ marginTop: 4 }}>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
         {PRESETS.map((p) => (
           <button
