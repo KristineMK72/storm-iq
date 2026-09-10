@@ -20,6 +20,22 @@ export default function ChaseModeMap() {
     return () => window.removeEventListener("stormiq-home-updated", onHome);
   }, []);
 
+  // Full-screen field UI: hide chrome while chase mode is on
+  useEffect(() => {
+    const root = document.documentElement;
+    if (chase) {
+      root.classList.add("chase-fullscreen");
+      document.body.classList.add("chase-fullscreen");
+    } else {
+      root.classList.remove("chase-fullscreen");
+      document.body.classList.remove("chase-fullscreen");
+    }
+    return () => {
+      root.classList.remove("chase-fullscreen");
+      document.body.classList.remove("chase-fullscreen");
+    };
+  }, [chase]);
+
   function toggle() {
     setChase((v) => {
       const next = !v;
@@ -43,9 +59,9 @@ export default function ChaseModeMap() {
           <div className="small muted" style={{ marginTop: 2 }}>
             {chase
               ? homeSet
-                ? "Near-me focus · tall map · live layers"
-                : "Tall map on — set Home base on Command for near-me zoom"
-              : "Flip on for a bigger field-ready map"}
+                ? "Full-screen map · near-me · live layers"
+                : "Full-screen map — set Home base on Command for near-me zoom"
+              : "Flip on for full-screen field map"}
           </div>
         </div>
 
@@ -60,9 +76,9 @@ export default function ChaseModeMap() {
 
       {chase && (
         <div className="chase-banner">
-          <span>CHASE MODE</span>
+          <span>CHASE MODE · FULL SCREEN</span>
           <span className="small muted">
-            Official warnings always win · do not drive into danger zones
+            Left toggles: RADAR · TORNADO · HAIL · POLYGONS · CITIES · REPORTS
           </span>
         </div>
       )}
