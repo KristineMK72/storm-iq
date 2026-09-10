@@ -16,21 +16,11 @@ export function focusMap(focus: MapFocus) {
   } catch {
     // ignore
   }
-  window.dispatchEvent(new CustomEvent(EVENT, { detail: focus }));
-}
-
-export function consumeStoredFocus(): MapFocus | null {
-  try {
-    const raw = sessionStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    sessionStorage.removeItem(STORAGE_key);
-    return JSON.parse(raw) as MapFocus;
-  } catch {
-    return null;
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(EVENT, { detail: focus }));
   }
 }
 
-// fix typo STORAGE_key -> STORAGE_KEY in consume - write carefully
 export function readAndClearFocus(): MapFocus | null {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY);

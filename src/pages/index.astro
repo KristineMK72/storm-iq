@@ -14,6 +14,7 @@ import ChaseRegions from "../components/ChaseRegions";
 import ChaseWatch from "../components/ChaseWatch";
 import MesoLinks from "../components/MesoLinks";
 import CarFieldGuide from "../components/CarFieldGuide";
+import ThreatStrip from "../components/ThreatStrip";
 ---
 
 <Layout title="Storm IQ | Command">
@@ -45,6 +46,7 @@ import CarFieldGuide from "../components/CarFieldGuide";
     </div>
   </section>
 
+  <ThreatStrip client:only="react" />
   <GoNoGo client:only="react" />
   <HomeBase client:only="react" />
 
@@ -68,7 +70,7 @@ import CarFieldGuide from "../components/CarFieldGuide";
         <div class="eyebrow">Audio watch</div>
         <h2>Chase alert sounds</h2>
       </div>
-      <span class="small muted">NEW</span>
+      <span class="small muted">SOUNDS</span>
     </div>
     <p class="muted" style="font-size:13px;line-height:1.55;margin:0 0 10px">
       Look for <strong style="color:var(--lime)">ENABLE CHASE SOUNDS</strong>.
