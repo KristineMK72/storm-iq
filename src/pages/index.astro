@@ -10,6 +10,8 @@ import UpcomingPotential from "../components/UpcomingPotential";
 import FutureOutlookMap from "../components/FutureOutlookMap";
 import FieldAlerts from "../components/FieldAlerts";
 import GoNoGo from "../components/GoNoGo";
+import ChaseRegions from "../components/ChaseRegions";
+import ChaseWatch from "../components/ChaseWatch";
 ---
 
 <Layout title="Storm IQ | Command">
@@ -55,22 +57,12 @@ import GoNoGo from "../components/GoNoGo";
         National weather environment online.
       </p>
 
-      <div
-        class="notice"
-        style="margin-top:20px"
-      >
-
-        <strong>
-          SAFETY FIRST
-        </strong>
-
-        <br />
-
+      <div class="notice" style="margin-top:20px">
+        <strong>SAFETY FIRST</strong><br />
         Storm IQ does not replace NWS warnings.
         If a warning conflicts with a target
         recommendation, follow the official
         warning and move to safety.
-
       </div>
 
     </div>
@@ -81,6 +73,10 @@ import GoNoGo from "../components/GoNoGo";
   <GoNoGo client:only="react" />
 
   <HomeBase client:only="react" />
+
+  <ChaseRegions client:only="react" />
+
+  <ChaseWatch client:only="react" />
 
   <div class="card" style="margin-bottom:18px;border-color:rgba(217,255,74,0.25)">
     <div class="section-title">
@@ -99,60 +95,31 @@ import GoNoGo from "../components/GoNoGo";
 
 
   <div class="grid dashboard-grid">
-
     <ChaseScore client:only="react" />
-
     <TargetBoard client:only="react" />
-
   </div>
 
 
-  <div
-    class="grid two"
-    style="margin-top:18px"
-  >
-
+  <div class="grid two" style="margin-top:18px">
     <div class="card">
-
       <div class="section-title">
-
         <div>
-
-          <div class="eyebrow">
-            National view
-          </div>
-
-          <h2>
-            Live operations map
-          </h2>
-
+          <div class="eyebrow">National view</div>
+          <h2>Live operations map</h2>
         </div>
-
-        <span class="small muted">
-          LIVE NWS + SPC
-        </span>
-
+        <span class="small muted">LIVE NWS + SPC</span>
       </div>
-
       <div class="map-shell">
-
         <StormMap client:only="react" />
-
       </div>
-
     </div>
-
-
     <ModelGuidance client:only="react" />
-
   </div>
 
 
   <UpcomingPotential client:only="react" />
 
-
   <div class="card" style="margin-top:18px">
-
     <div class="section-title">
       <div>
         <div class="eyebrow">Looking ahead</div>
@@ -160,16 +127,11 @@ import GoNoGo from "../components/GoNoGo";
       </div>
       <span class="small muted">DAY 2 / DAY 3 MAP</span>
     </div>
-
     <p class="muted" style="font-size:13px;line-height:1.55;margin:0 0 14px">
-      Separate map of potential severe footprints for tomorrow and the day after.
-      Outlooks only — not watches or warnings.
+      Potential severe footprints for tomorrow and the day after.
     </p>
-
     <FutureOutlookMap client:only="react" />
-
   </div>
-
 
   <LookingAhead client:only="react" />
 
