@@ -6,6 +6,7 @@ import {
   type HomeBase,
 } from "../lib/homeBase";
 import { focusMap } from "../lib/mapFocus";
+import { addChaseLog } from "../lib/chaseLog";
 
 type BoardItem = {
   id: string;
@@ -99,15 +100,6 @@ function isContiguousUS(lat?: number, lng?: number, areaDesc?: string, event?: s
   }
   if (lat == null && (e.includes("hurricane") || e.includes("tropical"))) return false;
   return true;
-}
-
-function fmtTime(iso?: string) {
-  if (!iso) return "—";
-  try {
-    return new Date(iso).toLocaleString();
-  } catch {
-    return iso;
-  }
 }
 
 async function loadOutlookTargets(): Promise<BoardItem[]> {
@@ -388,7 +380,21 @@ export default function TargetBoard() {
           <div key={item.id}>
             <button
               type="button"
-              onClick={() => setOpenId(open ? null : item.id)}
+              onClick={() => {
+                const next = open ? null : item.id;
+                setOpenId(next);
+                if (next) {
+                  addChaseLog({
+                    id: item.id,
+                    event: item.event,
+                    area: item.areaDesc || item.name,
+                    severity: item.severity,
+                    score: item.score,
+                    lat: item.lat,
+                    lng: item.lng,
+                  });
+                }
+              }}
               className="target-row"
               style={{
                 width: "100%",
