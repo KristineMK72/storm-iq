@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { loadHomeBase, type HomeBase } from "../lib/homeBase";
-import { fetchTodayReports, reportColor, reportLabel } from "../lib/lsr";
+import { fetchReports, reportColor, reportLabel } from "../lib/lsr";
 
 const SPC_COLORS: Record<string, string> = {
   TSTM: "#c1c1c1", MRGL: "#66cc66", SLGT: "#ffe066", ENH: "#ff9933", MDT: "#ff3333", HIGH: "#cc33ff",
@@ -81,6 +81,8 @@ export default function StormMap({ chaseMode = false }: { chaseMode?: boolean })
   const [showCities, setShowCities] = useState(true);
   const [showPolygons, setShowPolygons] = useState(true);
   const [showReports, setShowReports] = useState(true);
+  const [showYesterday, setShowYesterday] = useState(false);
+  const [nextRefreshIn, setNextRefreshIn] = useState(180);
   const [routeInfo, setRouteInfo] = useState("");
   const [lastRefresh, setLastRefresh] = useState("");
   const [selected, setSelected] = useState<{ lat: number; lng: number; title: string; dangerous: boolean } | null>(null);
@@ -88,6 +90,8 @@ export default function StormMap({ chaseMode = false }: { chaseMode?: boolean })
   selectedRef.current = selected;
   const showPolygonsRef = useRef(showPolygons);
   showPolygonsRef.current = showPolygons;
+  const showYesterdayRef = useRef(showYesterday);
+  showYesterdayRef.current = showYesterday;
 
   useEffect(() => {
     if (!mapRef.current || mapInstance.current) return;
@@ -211,15 +215,15 @@ export default function StormMap({ chaseMode = false }: { chaseMode?: boolean })
       try {
         if (reportsLayerRef.current) {
           reportsLayerRef.current.clearLayers();
-          const reports = await fetchTodayReports();
+          const reports = await fetchReports({ includeYesterday: showYesterdayRef.current });
           for (const r of reports) {
-            const color = reportColor(r.type);
-            const mk = L.circleMarker([r.lat, r.lng], { radius: r.type === "tornado" ? 7 : 5, color, fillColor: color, fillOpacity: 0.9, weight: 1.5 });
+            const color = reportColor(r.type, r.day);
+            const mk = L.circleMarker([r.lat, r.lng], { radius: r.type === "tornado" ? 7 : 5, color, fillColor: color, fillOpacity: r.day === "yesterday" ? 0.55 : 0.9, weight: 1.5 });
             const det = r.type === "hail" ? `Size: ${r.detail}` : r.type === "wind" ? `Speed: ${r.detail}` : `Scale: ${r.detail}`;
-            mk.bindPopup(`<div style="font-family:system-ui;min-width:180px;line-height:1.4"><strong>${reportLabel(r.type)}</strong><br/><span style="font-size:12px;color:#333">${r.location}, ${r.state}</span><br/><span style="font-size:11px;color:#555">${det}<br/>${r.county} · ${r.time}Z</span>${r.comments ? `<br/><span style="font-size:11px;color:#666">${r.comments}</span>` : ""}<div style="margin-top:6px;font-size:10px;color:#888">SPC local storm report</div></div>`);
+            mk.bindPopup(`<div style="font-family:system-ui;min-width:180px;line-height:1.4"><strong>${reportLabel(r.type, r.day)}</strong><br/><span style="font-size:12px;color:#333">${r.location}, ${r.state}</span><br/><span style="font-size:11px;color:#555">${det}<br/>${r.county} · ${r.time}Z</span>${r.comments ? `<br/><span style="font-size:11px;color:#666">${r.comments}</span>` : ""}<div style="margin-top:6px;font-size:10px;color:#888">SPC local storm report</div></div>`);
             mk.addTo(reportsLayerRef.current);
             reportDrawn++;
-            if (reportDrawn >= 250) break;
+            if (reportDrawn >= 400) break;
           }
         }
       } catch (e) { console.warn("LSR failed", e); }
@@ -229,9 +233,11 @@ export default function StormMap({ chaseMode = false }: { chaseMode?: boolean })
       const repNote = reportDrawn > 0 ? ` · reports ${reportDrawn}` : "";
       setStatus(`LIVE · ${outlookCount} outlook · ${alertCount} alerts${tornNote}${hailNote}${repNote}`);
       setLastRefresh(new Date().toLocaleTimeString());
+      setNextRefreshIn(180);
       setTimeout(() => m.invalidateSize(), 80);
     }
 
+    (map as any)._reloadLayers = loadLayers;
     loadLayers();
     const interval = window.setInterval(loadLayers, 180000);
     if (!document.getElementById("stormiq-city-css")) {
@@ -261,6 +267,14 @@ export default function StormMap({ chaseMode = false }: { chaseMode?: boolean })
     }, 220);
     return () => window.clearTimeout(t);
   }, [chaseMode]);
+
+  useEffect(() => {
+    setNextRefreshIn(180);
+    const id = window.setInterval(() => {
+      setNextRefreshIn((s) => (s <= 1 ? 180 : s - 1));
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [lastRefresh]);
 
   async function drawRoute() {
     const map = mapInstance.current;
@@ -332,13 +346,27 @@ export default function StormMap({ chaseMode = false }: { chaseMode?: boolean })
     if (showReports && reportsLayerRef.current && !map.hasLayer(reportsLayerRef.current)) reportsLayerRef.current.addTo(map);
     else if (!showReports && reportsLayerRef.current && map.hasLayer(reportsLayerRef.current)) map.removeLayer(reportsLayerRef.current);
   }, [showReports]);
+  useEffect(() => {
+    const map = mapInstance.current as any;
+    if (map?._reloadLayers) {
+      map._reloadLayers();
+      setNextRefreshIn(180);
+    }
+  }, [showYesterday]);
+
+  const mm = String(Math.floor(nextRefreshIn / 60));
+  const ss = String(nextRefreshIn % 60).padStart(2, "0");
 
   return (
     <div style={{ position: "relative", width: "100%", height: mapHeight, minHeight: mapHeight }}>
       <div id="storm-map" ref={mapRef} style={{ width: "100%", height: "100%", minHeight: mapHeight, borderRadius: 14, background: "#071014" }} />
-      <div style={{ position: "absolute", top: 12, right: 12, zIndex: 1000, background: "rgba(5,9,11,0.88)", border: "1px solid rgba(184,221,225,0.22)", borderRadius: 8, padding: "6px 11px", fontSize: 11, color: "#d9ff4a", fontWeight: 600, maxWidth: 220 }}>
+      <div style={{ position: "absolute", top: 12, right: 12, zIndex: 1000, background: "rgba(5,9,11,0.88)", border: "1px solid rgba(184,221,225,0.22)", borderRadius: 8, padding: "6px 11px", fontSize: 11, color: "#d9ff4a", fontWeight: 600, maxWidth: 240 }}>
         <div>{routeInfo || status}</div>
-        {lastRefresh && !routeInfo && <div style={{ fontSize: 9, opacity: 0.7, marginTop: 2 }}>Updated {lastRefresh}</div>}
+        {!routeInfo && (
+          <div style={{ fontSize: 9, opacity: 0.7, marginTop: 2 }}>
+            {lastRefresh ? `Updated ${lastRefresh}` : "…"} · next {mm}:{ss}
+          </div>
+        )}
         {chaseMode && <div style={{ fontSize: 9, opacity: 0.85, marginTop: 2 }}>CHASE MODE</div>}
       </div>
       <div style={{ position: "absolute", top: 12, left: 12, zIndex: 1000, display: "flex", flexDirection: "column", gap: 6 }}>
@@ -348,6 +376,7 @@ export default function StormMap({ chaseMode = false }: { chaseMode?: boolean })
         <button onClick={() => setShowPolygons((v) => !v)} style={btnStyle(showPolygons)}>{showPolygons ? "POLYGONS ON" : "POLYGONS OFF"}</button>
         <button onClick={() => setShowCities((v) => !v)} style={btnStyle(showCities)}>{showCities ? "CITIES ON" : "CITIES OFF"}</button>
         <button onClick={() => setShowReports((v) => !v)} style={btnStyle(showReports)}>{showReports ? "REPORTS ON" : "REPORTS OFF"}</button>
+        <button onClick={() => setShowYesterday((v) => !v)} style={btnStyle(showYesterday)}>{showYesterday ? "YESTERDAY ON" : "YESTERDAY OFF"}</button>
       </div>
       {selected && (
         <div style={{ position: "absolute", left: 12, right: 12, bottom: 16, zIndex: 1100, background: "rgba(5,9,11,0.94)", border: selected.dangerous ? "1px solid rgba(255,92,92,0.55)" : "1px solid rgba(217,255,74,0.35)", borderRadius: 12, padding: "12px 14px" }}>
