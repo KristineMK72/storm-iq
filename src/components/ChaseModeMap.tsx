@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import StormMap from "./StormMap";
 import { loadHomeBase } from "../lib/homeBase";
 
@@ -9,6 +9,8 @@ export default function ChaseModeMap() {
   const [chase, setChase] = useState(false);
   const [night, setNight] = useState(false);
   const [homeSet, setHomeSet] = useState(false);
+  const [wakeStatus, setWakeStatus] = useState("");
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
 
   useEffect(() => {
     try {
@@ -23,6 +25,7 @@ export default function ChaseModeMap() {
     return () => window.removeEventListener("stormiq-home-updated", onHome);
   }, []);
 
+  // Full-screen + night classes
   useEffect(() => {
     const root = document.documentElement;
     if (chase) {
@@ -46,6 +49,56 @@ export default function ChaseModeMap() {
       document.body.classList.remove("chase-night");
     };
   }, [chase, night]);
+
+  // Screen Wake Lock while Chase Mode is on
+  useEffect(() => {
+    let released = false;
+
+    async function requestLock() {
+      try {
+        if (!chase) {
+          if (wakeLockRef.current) {
+            await wakeLockRef.current.release();
+            wakeLockRef.current = null;
+          }
+          setWakeStatus("");
+          return;
+        }
+        if (!("wakeLock" in navigator)) {
+          setWakeStatus("Wake lock not supported on this browser");
+          return;
+        }
+        const lock = await (navigator as any).wakeLock.request("screen");
+        if (released) {
+          await lock.release();
+          return;
+        }
+        wakeLockRef.current = lock;
+        setWakeStatus("Screen stay-on · wake lock active");
+        lock.addEventListener("release", () => {
+          if (!released) setWakeStatus("Wake lock released — tap to re-enable via Chase Mode");
+        });
+      } catch {
+        setWakeStatus("Wake lock blocked — keep display on manually");
+      }
+    }
+
+    requestLock();
+
+    function onVis() {
+      if (document.visibilityState === "visible" && chase) requestLock();
+    }
+    document.addEventListener("visibilitychange", onVis);
+
+    return () => {
+      released = true;
+      document.removeEventListener("visibilitychange", onVis);
+      if (wakeLockRef.current) {
+        wakeLockRef.current.release().catch(() => {});
+        wakeLockRef.current = null;
+      }
+    };
+  }, [chase]);
 
   function toggle() {
     setChase((v) => {
@@ -72,7 +125,15 @@ export default function ChaseModeMap() {
   }
 
   return (
-    <div className={chase ? (night ? "chase-shell chase-on chase-night-shell" : "chase-shell chase-on") : "chase-shell"}>
+    <div
+      className={
+        chase
+          ? night
+            ? "chase-shell chase-on chase-night-shell"
+            : "chase-shell chase-on"
+          : "chase-shell"
+      }
+    >
       <div className="chase-toolbar">
         <div>
           <div className="eyebrow">{chase ? "Field mode" : "Operations"}</div>
@@ -82,10 +143,15 @@ export default function ChaseModeMap() {
           <div className="small muted" style={{ marginTop: 2 }}>
             {chase
               ? homeSet
-                ? "Full-screen · near-me · live layers"
-                : "Full-screen — set Home base on Command for near-me zoom"
-              : "Flip on for full-screen field map"}
+                ? "Full-screen · near-me · wake lock"
+                : "Full-screen + wake lock — set Home base for near-me zoom"
+              : "Flip on for full-screen field map + screen stay-on"}
           </div>
+          {chase && wakeStatus && (
+            <div className="small" style={{ marginTop: 4, color: "var(--lime)" }}>
+              {wakeStatus}
+            </div>
+          )}
         </div>
 
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -112,7 +178,7 @@ export default function ChaseModeMap() {
         <div className="chase-banner">
           <span>{night ? "NIGHT CHASE" : "CHASE MODE · FULL SCREEN"}</span>
           <span className="small muted">
-            Left: RADAR · TORNADO · HAIL · POLYGONS · CITIES · REPORTS · YESTERDAY · REFRESH
+            Wake lock keeps the screen awake while this tab is visible
           </span>
         </div>
       )}
