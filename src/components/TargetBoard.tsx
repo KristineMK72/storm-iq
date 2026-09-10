@@ -149,7 +149,7 @@ async function loadOutlookTargets(): Promise<BoardItem[]> {
 
     for (const f of geo?.features || []) {
       const label = (f.properties?.LABEL || f.properties?.label || "TSTM").toUpperCase();
-      if (label === "TSTM") continue; // skip general thunder for targets
+      if (label === "TSTM") continue;
       const score = RISK_SCORE[label] || 50;
       const center = getCentroid(f.geometry);
       if (!center) continue;
@@ -189,6 +189,7 @@ export default function TargetBoard() {
   const [etaStatus, setEtaStatus] = useState<"idle" | "calc" | "done">("idle");
   const [openId, setOpenId] = useState<string | null>(null);
   const [mode, setMode] = useState<"alerts" | "outlook">("alerts");
+  const [nearMe, setNearMe] = useState(false);
 
   useEffect(() => {
     setHome(loadHomeBase());
@@ -203,6 +204,7 @@ export default function TargetBoard() {
     async function load() {
       setStatus("loading");
       setEtaStatus("idle");
+      setNearMe(false);
 
       try {
         const res = await fetch("https://api.weather.gov/alerts/active", {
@@ -261,6 +263,7 @@ export default function TargetBoard() {
 
         scored.sort((a, b) => b.score - a.score);
 
+        // Keep a wider pool so near-me ranking has options
         const unique: BoardItem[] = [];
         const seen = new Set<string>();
         for (const item of scored) {
@@ -268,13 +271,13 @@ export default function TargetBoard() {
           if (seen.has(key)) continue;
           seen.add(key);
           unique.push(item);
-          if (unique.length >= 6) break;
+          if (unique.length >= 18) break;
         }
 
         let finalItems = unique;
         let finalMode: "alerts" | "outlook" = "alerts";
+        let usedNearMe = false;
 
-        // Quiet-day mode: fall back to SPC outlook risk areas
         if (unique.length === 0) {
           finalItems = await loadOutlookTargets();
           finalMode = "outlook";
@@ -300,12 +303,30 @@ export default function TargetBoard() {
               }
             })
           );
+
+          // Near-me ranking: closer first, then higher threat score
+          const withEta = finalItems.filter((i) => i.etaMin != null);
+          if (withEta.length >= 2 && finalMode === "alerts") {
+            withEta.sort((a, b) => {
+              const d = (a.etaMin ?? 9999) - (b.etaMin ?? 9999);
+              if (d !== 0) return d;
+              return b.score - a.score;
+            });
+            finalItems = withEta.slice(0, 6);
+            usedNearMe = true;
+          } else {
+            finalItems = finalItems.slice(0, 6);
+          }
+
           if (!cancelled) setEtaStatus("done");
+        } else {
+          finalItems = finalItems.slice(0, 6);
         }
 
         if (!cancelled) {
           setItems([...finalItems]);
           setMode(finalMode);
+          setNearMe(usedNearMe);
           setStatus(finalItems.length > 0 ? "ready" : "empty");
         }
       } catch {
@@ -335,11 +356,19 @@ export default function TargetBoard() {
             ? "CALC ETA…"
             : mode === "outlook"
             ? "WATCH WINDOWS"
+            : nearMe
+            ? "NEAR ME"
             : home
             ? "LIVE + ETA"
             : "LIVE NWS"}
         </span>
       </div>
+
+      {nearMe && status === "ready" && (
+        <p className="small muted" style={{ marginTop: 4, marginBottom: 8 }}>
+          Ranked by drive time from your home base (then threat score). Tap for full warning detail.
+        </p>
+      )}
 
       {mode === "outlook" && status === "ready" && (
         <p className="small muted" style={{ marginTop: 4, marginBottom: 8 }}>
@@ -350,7 +379,7 @@ export default function TargetBoard() {
 
       {!home && status === "ready" && mode === "alerts" && (
         <p className="small muted" style={{ marginTop: 4, marginBottom: 8 }}>
-          Set Home base above to see drive times. Tap a target for full warning detail.
+          Set Home base above to rank by drive time. Tap a target for full warning detail.
         </p>
       )}
 
@@ -440,8 +469,7 @@ export default function TargetBoard() {
                       border: "1px solid rgba(255,209,102,0.25)",
                     }}
                   >
-                    Watch window only — not an NWS warning. Do not treat this as
-                    a go/no-go for driving into storms.
+                    Watch window only — not an NWS warning.
                   </div>
                 )}
 
@@ -564,7 +592,9 @@ export default function TargetBoard() {
 
       {home && etaStatus === "done" && items.some((i) => i.etaMin != null) && (
         <p className="small muted" style={{ marginTop: 10 }}>
-          ETAs are approximate drive times from your home base (contiguous US).
+          {nearMe
+            ? "Near-me ranking uses approximate drive times from your home base."
+            : "ETAs are approximate drive times from your home base (contiguous US)."}
         </p>
       )}
     </div>
