@@ -377,6 +377,14 @@ export default function StormMap({ chaseMode = false }: { chaseMode?: boolean })
         <button onClick={() => setShowCities((v) => !v)} style={btnStyle(showCities)}>{showCities ? "CITIES ON" : "CITIES OFF"}</button>
         <button onClick={() => setShowReports((v) => !v)} style={btnStyle(showReports)}>{showReports ? "REPORTS ON" : "REPORTS OFF"}</button>
         <button onClick={() => setShowYesterday((v) => !v)} style={btnStyle(showYesterday)}>{showYesterday ? "YESTERDAY ON" : "YESTERDAY OFF"}</button>
+        <button onClick={() => {
+          const map = mapInstance.current as any;
+          if (map?._reloadLayers) {
+            setStatus("Refreshing…");
+            map._reloadLayers();
+            setNextRefreshIn(180);
+          }
+        }} style={btnStyle(false)}>REFRESH</button>
       </div>
       {selected && (
         <div style={{ position: "absolute", left: 12, right: 12, bottom: 16, zIndex: 1100, background: "rgba(5,9,11,0.94)", border: selected.dangerous ? "1px solid rgba(255,92,92,0.55)" : "1px solid rgba(217,255,74,0.35)", borderRadius: 12, padding: "12px 14px" }}>
