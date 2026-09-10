@@ -126,6 +126,16 @@ export default function StormMap({ chaseMode = false }: { chaseMode?: boolean })
     if (home) {
       L.circleMarker([home.lat, home.lng], { radius: 9, color: "#d9ff4a", fillColor: "#d9ff4a", fillOpacity: 0.95, weight: 2 })
         .bindPopup("<strong>Home base</strong>").addTo(map);
+      for (const mi of [50, 100, 150]) {
+        L.circle([home.lat, home.lng], {
+          radius: mi * 1609.34,
+          color: "#d9ff4a",
+          weight: 1,
+          fill: false,
+          opacity: mi === 50 ? 0.55 : mi === 100 ? 0.35 : 0.22,
+          dashArray: "4 6",
+        }).bindTooltip(`${mi} mi`, { permanent: false, direction: "center" }).addTo(map);
+      }
     }
 
     const regionGroup = L.layerGroup().addTo(map);
