@@ -3,6 +3,8 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { loadHomeBase, type HomeBase } from "../lib/homeBase";
 import { fetchReports, reportColor, reportLabel } from "../lib/lsr";
+import { loadRegions } from "../lib/chaseRegions";
+import { onMapFocus, readAndClearFocus } from "../lib/mapFocus";
 
 const SPC_COLORS: Record<string, string> = {
   TSTM: "#c1c1c1", MRGL: "#66cc66", SLGT: "#ffe066", ENH: "#ff9933", MDT: "#ff3333", HIGH: "#cc33ff",
@@ -119,6 +121,24 @@ export default function StormMap({ chaseMode = false }: { chaseMode?: boolean })
       L.circleMarker([home.lat, home.lng], { radius: 9, color: "#d9ff4a", fillColor: "#d9ff4a", fillOpacity: 0.95, weight: 2 })
         .bindPopup("<strong>Home base</strong>").addTo(map);
     }
+
+    const regionGroup = L.layerGroup().addTo(map);
+    try {
+      for (const r of loadRegions()) {
+        L.circle([r.lat, r.lng], {
+          radius: r.radiusMi * 1609.34,
+          color: "#52e0d0",
+          weight: 1.5,
+          fillColor: "#52e0d0",
+          fillOpacity: 0.06,
+          dashArray: "6 4",
+        }).bindPopup(`<strong>${r.name}</strong><br/>Saved chase region · ${r.radiusMi} mi`).addTo(regionGroup);
+        L.circleMarker([r.lat, r.lng], { radius: 5, color: "#52e0d0", fillColor: "#52e0d0", fillOpacity: 0.9, weight: 1 })
+          .bindPopup(`<strong>${r.name}</strong>`).addTo(regionGroup);
+      }
+    } catch (e) { console.warn("regions", e); }
+    (map as any)._regionGroup = regionGroup;
+
     mapInstance.current = map;
     const resize = () => map.invalidateSize();
     setTimeout(resize, 100); setTimeout(resize, 400);
@@ -364,6 +384,33 @@ export default function StormMap({ chaseMode = false }: { chaseMode?: boolean })
       setNextRefreshIn(180);
     }
   }, [showYesterday]);
+
+  useEffect(() => {
+    function applyFocus(f: { lat: number; lng: number; title?: string; zoom?: number }) {
+      const map = mapInstance.current;
+      if (!map) return;
+      map.setView([f.lat, f.lng], f.zoom ?? 7, { animate: true });
+      L.circleMarker([f.lat, f.lng], {
+        radius: 10,
+        color: "#d9ff4a",
+        fillColor: "#d9ff4a",
+        fillOpacity: 0.35,
+        weight: 2,
+      }).bindPopup(`<strong>${f.title || "Target"}</strong>`).addTo(map).openPopup();
+    }
+
+    let timer: number | undefined;
+    const stored = readAndClearFocus();
+    if (stored) {
+      timer = window.setTimeout(() => applyFocus(stored), 400);
+    }
+
+    const off = onMapFocus((f) => applyFocus(f));
+    return () => {
+      if (timer) window.clearTimeout(timer);
+      off();
+    };
+  }, []);
 
   const mm = String(Math.floor(nextRefreshIn / 60));
   const ss = String(nextRefreshIn % 60).padStart(2, "0");
