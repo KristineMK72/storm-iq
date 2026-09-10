@@ -1,7 +1,7 @@
 export default function CarFieldGuide() {
   return (
     <div className="card" style={{ marginBottom: 18 }}>
-      <div class="section-title">
+      <div className="section-title">
         <div>
           <div className="eyebrow">Field deploy</div>
           <h2>Car · CarPlay · Android</h2>

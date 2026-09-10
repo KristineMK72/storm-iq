@@ -12,69 +12,42 @@ import FieldAlerts from "../components/FieldAlerts";
 import GoNoGo from "../components/GoNoGo";
 import ChaseRegions from "../components/ChaseRegions";
 import ChaseWatch from "../components/ChaseWatch";
+import MesoLinks from "../components/MesoLinks";
+import CarFieldGuide from "../components/CarFieldGuide";
 ---
 
 <Layout title="Storm IQ | Command">
 
   <section class="hero">
-
     <div class="hero-copy">
-
-      <span class="hero-tag">
-        NATIONWIDE STORM INTELLIGENCE
-      </span>
-
+      <span class="hero-tag">NATIONWIDE STORM INTELLIGENCE</span>
       <h1>
         KNOW WHERE<br />
-        <span style="color:var(--lime)">
-          THE STORM
-        </span><br />
+        <span style="color:var(--lime)">THE STORM</span><br />
         IS GOING.
       </h1>
-
       <p>
-        Storm IQ combines official weather guidance,
-        storm environments, timing, target scoring
-        and safety information into one command
-        dashboard for storm observers across the
-        United States.
+        Storm IQ combines official weather guidance, storm environments, timing,
+        target scoring and safety information into one command dashboard for storm
+        observers across the United States.
       </p>
-
     </div>
-
 
     <div class="card">
-
-      <div class="eyebrow">
-        System status
-      </div>
-
-      <h2 style="margin-top:7px">
-        Monitoring
-      </h2>
-
-      <p class="muted">
-        National weather environment online.
-      </p>
-
+      <div class="eyebrow">System status</div>
+      <h2 style="margin-top:7px">Monitoring</h2>
+      <p class="muted">National weather environment online.</p>
       <div class="notice" style="margin-top:20px">
         <strong>SAFETY FIRST</strong><br />
-        Storm IQ does not replace NWS warnings.
-        If a warning conflicts with a target
-        recommendation, follow the official
-        warning and move to safety.
+        Storm IQ does not replace NWS warnings. If a warning conflicts with a target
+        recommendation, follow the official warning and move to safety.
       </div>
-
     </div>
-
   </section>
 
-
   <GoNoGo client:only="react" />
-
   <HomeBase client:only="react" />
 
-  <!-- Always-visible shells so these never look "missing" before React loads -->
   <div class="card" style="margin-bottom:18px;border-color:rgba(82,224,208,0.28)">
     <div class="section-title">
       <div>
@@ -84,7 +57,7 @@ import ChaseWatch from "../components/ChaseWatch";
       <span class="small muted">PIN AREAS</span>
     </div>
     <p class="muted" style="font-size:13px;line-height:1.55;margin:0 0 10px">
-      Controls load below — pin Tornado Alley, Dixie, High Plains, or your home base.
+      Pin Tornado Alley, Dixie, High Plains, or your home base.
     </p>
     <ChaseRegions client:only="react" />
   </div>
@@ -98,8 +71,7 @@ import ChaseWatch from "../components/ChaseWatch";
       <span class="small muted">NEW</span>
     </div>
     <p class="muted" style="font-size:13px;line-height:1.55;margin:0 0 10px">
-      Look for <strong style="color:var(--lime)">ENABLE CHASE SOUNDS</strong> —
-      soft tone for Day 1/2 Enhanced+ near your zones, urgent tone for near-me warnings.
+      Look for <strong style="color:var(--lime)">ENABLE CHASE SOUNDS</strong>.
     </p>
     <ChaseWatch client:only="react" />
   </div>
@@ -113,18 +85,18 @@ import ChaseWatch from "../components/ChaseWatch";
       <span class="small muted">PWA</span>
     </div>
     <p class="muted" style="font-size:13px;line-height:1.55;margin:0 0 8px">
-      Look for <strong style="color:var(--lime)">ENABLE NEAR-ME ALERTS</strong>
-      and install / home-screen options.
+      Look for <strong style="color:var(--lime)">ENABLE NEAR-ME ALERTS</strong>.
     </p>
     <FieldAlerts client:only="react" />
   </div>
 
+  <MesoLinks client:only="react" />
+  <CarFieldGuide />
 
   <div class="grid dashboard-grid">
     <ChaseScore client:only="react" />
     <TargetBoard client:only="react" />
   </div>
-
 
   <div class="grid two" style="margin-top:18px">
     <div class="card">
@@ -141,7 +113,6 @@ import ChaseWatch from "../components/ChaseWatch";
     </div>
     <ModelGuidance client:only="react" />
   </div>
-
 
   <UpcomingPotential client:only="react" />
 
