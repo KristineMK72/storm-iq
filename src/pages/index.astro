@@ -79,7 +79,22 @@ import FieldAlerts from "../components/FieldAlerts";
 
   <HomeBase client:only="react" />
 
-  <FieldAlerts client:only="react" />
+  <!-- Always-visible anchor so users can find this section -->
+  <div class="card" style="margin-bottom:18px;border-color:rgba(217,255,74,0.25)">
+    <div class="section-title">
+      <div>
+        <div class="eyebrow">Field tools</div>
+        <h2>Install &amp; near-me alerts</h2>
+      </div>
+      <span class="small muted">NEW</span>
+    </div>
+    <p class="muted" style="font-size:13px;line-height:1.55;margin:0 0 8px">
+      Scroll tools below load live in your browser. Look for
+      <strong style="color:var(--lime)">ENABLE NEAR-ME ALERTS</strong>
+      and install / home-screen options.
+    </p>
+    <FieldAlerts client:only="react" />
+  </div>
 
 
   <div class="grid dashboard-grid">

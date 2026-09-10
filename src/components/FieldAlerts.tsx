@@ -225,24 +225,9 @@ export default function FieldAlerts() {
     setCanInstall(false);
   }
 
+  // Compact UI when nested inside a parent card on Command
   return (
-    <div className="card" style={{ marginBottom: 18 }}>
-      <div className="section-title">
-        <div>
-          <div className="eyebrow">Field tools</div>
-          <h2>Install & alerts</h2>
-        </div>
-        <span className="small muted">
-          {enabled && perm === "granted" ? "WATCHING" : "OPTIONAL"}
-        </span>
-      </div>
-
-      <p className="muted" style={{ fontSize: 13, lineHeight: 1.55, margin: "0 0 14px" }}>
-        Add Storm IQ to your home screen and get browser alerts when a tornado,
-        severe thunderstorm, or flash flood warning appears within about{" "}
-        {RADIUS_MI} miles of your home base.
-      </p>
-
+    <div style={{ marginTop: 4 }}>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
         {canInstall && (
           <button type="button" className="chase-btn" onClick={installApp}>
@@ -259,12 +244,12 @@ export default function FieldAlerts() {
               borderRadius: 8,
             }}
           >
-            Install: use browser menu → “Add to Home Screen”
+            Install: browser menu → “Add to Home Screen”
           </span>
         )}
 
         {perm === "unsupported" && (
-          <span className="small muted">Notifications not supported in this browser</span>
+          <span className="small muted">Notifications not supported here</span>
         )}
 
         {perm !== "unsupported" && !enabled && (
@@ -285,7 +270,7 @@ export default function FieldAlerts() {
 
         {perm === "denied" && (
           <span className="small muted">
-            Notifications blocked — enable them in browser settings
+            Notifications blocked — enable in browser settings
           </span>
         )}
       </div>
@@ -297,8 +282,8 @@ export default function FieldAlerts() {
       )}
 
       <p className="small muted" style={{ marginTop: 10, lineHeight: 1.5 }}>
-        Alerts require a set Home base and only fire for new priority warnings.
-        This does not replace NWS Wireless Emergency Alerts on your phone.
+        Needs Home base set above. Only new tornado / severe / flash-flood
+        warnings within ~{RADIUS_MI} mi. Does not replace phone emergency alerts.
       </p>
     </div>
   );
