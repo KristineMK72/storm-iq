@@ -24,6 +24,14 @@ function isActive(href: string) {
 
     <meta name="theme-color" content="#05090b" />
     <meta name="description" content={description} />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Storm IQ" />
+
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="/og.svg" />
+    <link rel="apple-touch-icon" href="/og.svg" />
 
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Storm IQ" />
@@ -38,8 +46,6 @@ function isActive(href: string) {
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogImage} />
-
-    <link rel="icon" type="image/svg+xml" href="/og.svg" />
 
     <title>{title}</title>
   </head>
@@ -115,6 +121,12 @@ function isActive(href: string) {
             btn.classList.remove("open");
           }
         });
+
+        if ("serviceWorker" in navigator) {
+          window.addEventListener("load", function () {
+            navigator.serviceWorker.register("/sw.js").catch(function () {});
+          });
+        }
       })();
     </script>
   </body>

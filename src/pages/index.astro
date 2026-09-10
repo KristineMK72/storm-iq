@@ -8,6 +8,7 @@ import HomeBase from "../components/HomeBase";
 import LookingAhead from "../components/LookingAhead";
 import UpcomingPotential from "../components/UpcomingPotential";
 import FutureOutlookMap from "../components/FutureOutlookMap";
+import FieldAlerts from "../components/FieldAlerts";
 ---
 
 <Layout title="Storm IQ | Command">
@@ -77,6 +78,8 @@ import FutureOutlookMap from "../components/FutureOutlookMap";
 
 
   <HomeBase client:only="react" />
+
+  <FieldAlerts client:only="react" />
 
 
   <div class="grid dashboard-grid">

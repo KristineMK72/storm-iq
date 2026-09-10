@@ -1,0 +1,25 @@
+{
+  "name": "Storm IQ",
+  "short_name": "Storm IQ",
+  "description": "Live storm intelligence for safer observation — NWS alerts, SPC outlooks, radar, and chase targeting.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#05090b",
+  "theme_color": "#05090b",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/og.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/og.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
