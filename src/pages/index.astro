@@ -7,6 +7,7 @@ import ModelGuidance from "../components/ModelGuidance";
 import HomeBase from "../components/HomeBase";
 import LookingAhead from "../components/LookingAhead";
 import UpcomingPotential from "../components/UpcomingPotential";
+import FutureOutlookMap from "../components/FutureOutlookMap";
 ---
 
 <Layout title="Storm IQ | Command">
@@ -129,6 +130,27 @@ import UpcomingPotential from "../components/UpcomingPotential";
 
 
   <UpcomingPotential client:only="react" />
+
+
+  <div class="card" style="margin-top:18px">
+
+    <div class="section-title">
+      <div>
+        <div class="eyebrow">Looking ahead</div>
+        <h2>Future target areas</h2>
+      </div>
+      <span class="small muted">DAY 2 / DAY 3 MAP</span>
+    </div>
+
+    <p class="muted" style="font-size:13px;line-height:1.55;margin:0 0 14px">
+      Separate map of potential severe footprints for tomorrow and the day after.
+      Outlooks only — not watches or warnings.
+    </p>
+
+    <FutureOutlookMap client:only="react" />
+
+  </div>
+
 
   <LookingAhead client:only="react" />
 
