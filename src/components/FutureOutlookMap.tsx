@@ -49,6 +49,7 @@ export default function FutureOutlookMap() {
   const [day, setDay] = useState<DayKey>("day2");
   const [status, setStatus] = useState("Loading outlook…");
   const [counts, setCounts] = useState<Record<string, number>>({});
+  const [errorDetail, setErrorDetail] = useState("");
 
   useEffect(() => {
     if (!mapRef.current || mapInstance.current) return;
@@ -95,34 +96,48 @@ export default function FutureOutlookMap() {
       group!.clearLayers();
       setStatus(`Loading ${SOURCES[day].label}…`);
       setCounts({});
+      setErrorDetail("");
 
       try {
+        // No custom headers — avoids CORS preflight issues in the browser
         const res = await fetch(SOURCES[day].url, {
-          headers: { "User-Agent": "StormIQ (https://storm-iq.vercel.app)" },
+          mode: "cors",
+          cache: "no-cache",
         });
-        if (!res.ok) throw new Error("fetch failed");
+
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+
         const geo = await res.json();
         if (cancelled) return;
 
+        const features = geo?.features || [];
         const tally: Record<string, number> = {};
         let drawn = 0;
+        const bounds = L.latLngBounds([]);
 
-        (geo?.features || []).forEach((f: any) => {
-          const label = (f.properties?.LABEL || f.properties?.label || "TSTM").toUpperCase();
+        features.forEach((f: any) => {
+          const label = String(
+            f.properties?.LABEL || f.properties?.label || "TSTM"
+          ).toUpperCase();
+
           if (!hasDrawableGeometry(f.geometry)) return;
 
           const color = SPC_COLORS[label] || "#888";
           tally[label] = (tally[label] || 0) + 1;
 
-          L.geoJSON(f, {
-            style: {
-              color,
-              weight: label === "TSTM" ? 1 : 2.5,
-              fillColor: color,
-              fillOpacity: label === "TSTM" ? 0.08 : 0.28,
-            },
-          })
-            .bindPopup(
+          try {
+            const layer = L.geoJSON(f, {
+              style: {
+                color,
+                weight: label === "TSTM" ? 1.5 : 2.5,
+                fillColor: color,
+                fillOpacity: label === "TSTM" ? 0.1 : 0.32,
+              },
+            });
+
+            layer.bindPopup(
               `<div style="font-family:system-ui;min-width:180px">
                 <strong>SPC ${SOURCES[day].label} · ${label}</strong><br/>
                 <span style="font-size:12px;color:#333">
@@ -131,29 +146,61 @@ export default function FutureOutlookMap() {
                 <a href="${SOURCES[day].html}" target="_blank" rel="noopener"
                    style="font-size:11px;color:#0a7">Full ${SOURCES[day].label} discussion →</a>
               </div>`
-            )
-            .addTo(group!);
+            );
 
-          drawn++;
+            layer.addTo(group!);
+
+            try {
+              const b = layer.getBounds();
+              if (b.isValid()) bounds.extend(b);
+            } catch {
+              // ignore
+            }
+
+            drawn++;
+          } catch (err) {
+            console.warn("Failed to draw feature", label, err);
+          }
         });
 
         setCounts(tally);
 
         if (drawn === 0) {
-          setStatus(`${SOURCES[day].label} · no categorical areas drawn`);
+          setStatus(`${SOURCES[day].label} · no areas to draw`);
+          setErrorDetail(
+            features.length
+              ? "SPC returned features but none had drawable geometry."
+              : "SPC returned an empty outlook for this period."
+          );
         } else {
-          setStatus(`${SOURCES[day].label} · ${drawn} risk area${drawn === 1 ? "" : "s"}`);
+          setStatus(
+            `${SOURCES[day].label} · ${drawn} risk area${drawn === 1 ? "" : "s"}`
+          );
+          if (bounds.isValid()) {
+            map!.fitBounds(bounds, { padding: [30, 30], maxZoom: 6 });
+          }
         }
 
-        setTimeout(() => map!.invalidateSize(), 80);
-      } catch {
-        if (!cancelled) setStatus(`Could not load ${SOURCES[day].label} outlook`);
+        setTimeout(() => map!.invalidateSize(), 100);
+      } catch (err: any) {
+        console.error("Future outlook load failed", err);
+        if (!cancelled) {
+          setStatus(`Could not load ${SOURCES[day].label}`);
+          setErrorDetail(
+            err?.message
+              ? String(err.message)
+              : "Network or CORS error talking to SPC."
+          );
+        }
       }
     }
 
-    load();
+    // Small delay so map container has size
+    const t = window.setTimeout(load, 150);
+
     return () => {
       cancelled = true;
+      window.clearTimeout(t);
     };
   }, [day]);
 
@@ -240,6 +287,20 @@ export default function FutureOutlookMap() {
           <div><span style={{ color: "#cc33ff" }}>■</span> High</div>
         </div>
       </div>
+
+      {errorDetail && (
+        <p style={{ color: "#ff9f43", fontSize: 12, marginTop: 10 }}>
+          {errorDetail}{" "}
+          <a
+            href={SOURCES[day].html}
+            target="_blank"
+            rel="noopener"
+            style={{ color: "var(--cyan)", fontWeight: 600 }}
+          >
+            Open on SPC →
+          </a>
+        </p>
+      )}
 
       {Object.keys(counts).length > 0 && (
         <div
