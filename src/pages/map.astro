@@ -2,6 +2,7 @@
 import Layout from "../layouts/Layout.astro";
 import StormMap from "../components/StormMap";
 import OutlookDiscussion from "../components/OutlookDiscussion";
+import FutureOutlookMap from "../components/FutureOutlookMap";
 ---
 
 <Layout title="Storm IQ | Map">
@@ -17,9 +18,8 @@ import OutlookDiscussion from "../components/OutlookDiscussion";
     </h1>
 
     <p>
-      Live National Weather Service alerts plus the
-      official SPC Day 1 convective outlook (look-ahead
-      risk areas). Scroll down for the full written discussion.
+      Live National Weather Service alerts, radar, and SPC Day 1 risk areas.
+      Scroll down for a separate map of potential future target areas (Day 2 / Day 3).
     </p>
 
   </div>
@@ -27,11 +27,37 @@ import OutlookDiscussion from "../components/OutlookDiscussion";
 
   <div class="card">
 
-    <div class="map-shell">
-
-      <StormMap client:only="react" />
-
+    <div class="section-title">
+      <div>
+        <div class="eyebrow">Now</div>
+        <h2>Live operations</h2>
+      </div>
+      <span class="small muted">DAY 1 + ALERTS</span>
     </div>
+
+    <div class="map-shell">
+      <StormMap client:only="react" />
+    </div>
+
+  </div>
+
+
+  <div class="card" style="margin-top:18px">
+
+    <div class="section-title">
+      <div>
+        <div class="eyebrow">Looking ahead</div>
+        <h2>Future target areas</h2>
+      </div>
+      <span class="small muted">DAY 2 / DAY 3</span>
+    </div>
+
+    <p class="muted" style="font-size:13px;line-height:1.55;margin:0 0 14px">
+      Potential severe weather footprints for tomorrow and the day after.
+      Use these to plan travel windows — they are outlooks only, not warnings.
+    </p>
+
+    <FutureOutlookMap client:only="react" />
 
   </div>
 
@@ -48,10 +74,8 @@ import OutlookDiscussion from "../components/OutlookDiscussion";
       LIVE DATA:
     </strong>
 
-    Colored regions = SPC Day 1 categorical outlook
-    (Marginal → High risk). Dots = active NWS alerts.
-    The discussion below is the official SPC text
-    explaining the expected threats and timing.
+    Top map = radar, Day 1 outlook, alert polygons/dots.
+    Bottom map = Day 2 / Day 3 categorical risk for future targeting.
     Official NWS warnings always take priority.
 
   </div>
