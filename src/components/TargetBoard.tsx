@@ -5,6 +5,7 @@ import {
   loadHomeBase,
   type HomeBase,
 } from "../lib/homeBase";
+import { focusMap } from "../lib/mapFocus";
 
 type BoardItem = {
   id: string;
@@ -92,16 +93,7 @@ function getCentroid(geometry: any): [number, number] | null {
 function isContiguousUS(lat?: number, lng?: number, areaDesc?: string, event?: string): boolean {
   const e = (event || "").toLowerCase();
   const a = (areaDesc || "").toLowerCase();
-  if (
-    a.includes("hawaii") ||
-    a.includes("alaska") ||
-    a.includes("puerto rico") ||
-    a.includes("guam") ||
-    a.includes("virgin islands") ||
-    /\bhi\b/.test(a) ||
-    /\bak\b/.test(a)
-  )
-    return false;
+  if (a.includes("hawaii") || a.includes("alaska") || a.includes("puerto rico") || a.includes("guam") || a.includes("virgin islands") || /\bhi\b/.test(a) || /\bak\b/.test(a)) return false;
   if (lat != null && lng != null) {
     if (lat < 24.5 || lat > 49.5 || lng < -125 || lng > -66.5) return false;
   }
@@ -308,7 +300,7 @@ export default function TargetBoard() {
         return;
       }
     } catch {
-      /* clipboard */
+      /* */
     }
     try {
       await navigator.clipboard.writeText(text);
@@ -381,21 +373,6 @@ export default function TargetBoard() {
         ))}
       </div>
 
-      {nearMe && status === "ready" && (
-        <p className="small muted" style={{ marginTop: 4, marginBottom: 8 }}>
-          Ranked by drive time from your home base (then threat score). Tap for full warning detail.
-        </p>
-      )}
-      {mode === "outlook" && status === "ready" && (
-        <p className="small muted" style={{ marginTop: 4, marginBottom: 8 }}>
-          Quiet on active CONUS warnings — showing SPC Day 1 risk areas as planning windows.
-        </p>
-      )}
-      {!home && status === "ready" && mode === "alerts" && (
-        <p className="small muted" style={{ marginTop: 4, marginBottom: 8 }}>
-          Set Home base above to rank by drive time. Tap a target for full warning detail.
-        </p>
-      )}
       {status === "loading" && <p className="muted" style={{ marginTop: 12 }}>Loading live alerts…</p>}
       {(status === "empty" || status === "error" || (status === "ready" && filteredItems.length === 0)) && (
         <p className="muted" style={{ marginTop: 12 }}>
@@ -455,115 +432,56 @@ export default function TargetBoard() {
                   lineHeight: 1.5,
                 }}
               >
-                {item.kind === "outlook" && (
-                  <div
-                    style={{
-                      fontSize: 12,
-                      color: "#ffd166",
-                      marginBottom: 10,
-                      padding: 8,
-                      borderRadius: 8,
-                      background: "rgba(255,209,102,0.08)",
-                      border: "1px solid rgba(255,209,102,0.25)",
-                    }}
-                  >
-                    Watch window only — not an NWS warning.
-                  </div>
-                )}
                 {item.headline && <div style={{ fontWeight: 700, marginBottom: 8 }}>{item.headline}</div>}
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
-                    gap: 8,
-                    marginBottom: 12,
-                    fontSize: 12,
-                  }}
-                >
-                  <div>
-                    <div className="small muted">Severity</div>
-                    <strong>{item.severity || "—"}</strong>
-                  </div>
-                  <div>
-                    <div className="small muted">Urgency</div>
-                    <strong>{item.urgency || "—"}</strong>
-                  </div>
-                  <div>
-                    <div className="small muted">Certainty</div>
-                    <strong>{item.certainty || "—"}</strong>
-                  </div>
-                  <div>
-                    <div className="small muted">Office</div>
-                    <strong style={{ fontSize: 11 }}>{item.senderName || "NWS / SPC"}</strong>
-                  </div>
-                </div>
                 <div className="small muted" style={{ marginBottom: 4 }}>
                   Area
                 </div>
                 <div style={{ marginBottom: 10, color: "var(--muted)", fontSize: 12 }}>
                   {item.areaDesc || "—"}
                 </div>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: 8,
-                    marginBottom: 12,
-                    fontSize: 12,
-                  }}
-                >
-                  <div>
-                    <div className="small muted">Onset</div>
-                    <strong>{fmtTime(item.onset)}</strong>
-                  </div>
-                  <div>
-                    <div className="small muted">Expires</div>
-                    <strong>{fmtTime(item.expires)}</strong>
-                  </div>
-                </div>
                 {item.description && (
-                  <>
-                    <div className="small muted" style={{ marginBottom: 4 }}>
-                      Full detail
-                    </div>
-                    <pre
-                      style={{
-                        whiteSpace: "pre-wrap",
-                        fontFamily: "inherit",
-                        fontSize: 12,
-                        color: "var(--muted)",
-                        margin: "0 0 12px",
-                        maxHeight: 220,
-                        overflow: "auto",
-                        lineHeight: 1.5,
-                      }}
-                    >
-                      {item.description}
-                    </pre>
-                  </>
-                )}
-                {item.instruction && (
-                  <>
-                    <div className="small muted" style={{ marginBottom: 4 }}>
-                      Instructions / safety
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 12,
-                        color: "#cdd9b0",
-                        background: "rgba(217,255,74,0.06)",
-                        border: "1px solid rgba(217,255,74,0.18)",
-                        borderRadius: 8,
-                        padding: 10,
-                        marginBottom: 12,
-                        lineHeight: 1.5,
-                      }}
-                    >
-                      {item.instruction}
-                    </div>
-                  </>
+                  <pre
+                    style={{
+                      whiteSpace: "pre-wrap",
+                      fontFamily: "inherit",
+                      fontSize: 12,
+                      color: "var(--muted)",
+                      margin: "0 0 12px",
+                      maxHeight: 180,
+                      overflow: "auto",
+                    }}
+                  >
+                    {item.description}
+                  </pre>
                 )}
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                  {item.lat != null && item.lng != null && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        focusMap({
+                          lat: item.lat!,
+                          lng: item.lng!,
+                          title: item.event,
+                          zoom: 7,
+                        });
+                        window.location.href = "/map";
+                      }}
+                      style={{
+                        background: "rgba(82,224,208,0.12)",
+                        border: "1px solid rgba(82,224,208,0.4)",
+                        color: "#52e0d0",
+                        borderRadius: 8,
+                        padding: "6px 10px",
+                        fontSize: 11,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                      }}
+                    >
+                      VIEW ON MAP
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={(e) => {
@@ -586,9 +504,6 @@ export default function TargetBoard() {
                   <a href="/map" style={{ fontSize: 11, fontWeight: 700, color: "var(--cyan)" }}>
                     Open map →
                   </a>
-                  <a href="/alerts" style={{ fontSize: 11, fontWeight: 700, color: "var(--cyan)" }}>
-                    All alerts →
-                  </a>
                   <a
                     href="https://www.spc.noaa.gov/products/md/"
                     target="_blank"
@@ -596,14 +511,6 @@ export default function TargetBoard() {
                     style={{ fontSize: 11, fontWeight: 700, color: "var(--cyan)" }}
                   >
                     SPC MDs →
-                  </a>
-                  <a
-                    href="https://www.spc.noaa.gov/products/outlook/day1otlk.html"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ fontSize: 11, fontWeight: 700, color: "var(--cyan)" }}
-                  >
-                    Day 1 discussion →
                   </a>
                 </div>
                 {shareNote && (
@@ -616,14 +523,6 @@ export default function TargetBoard() {
           </div>
         );
       })}
-
-      {home && etaStatus === "done" && items.some((i) => i.etaMin != null) && (
-        <p className="small muted" style={{ marginTop: 10 }}>
-          {nearMe
-            ? "Near-me ranking uses approximate drive times from your home base."
-            : "ETAs are approximate drive times from your home base."}
-        </p>
-      )}
     </div>
   );
 }
