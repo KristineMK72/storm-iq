@@ -16,6 +16,9 @@ import MesoLinks from "../components/MesoLinks";
 import CarFieldGuide from "../components/CarFieldGuide";
 import ThreatStrip from "../components/ThreatStrip";
 import QuietDay from "../components/QuietDay";
+import ChaseLogPanel from "../components/ChaseLog";
+import OfflineSnapPanel from "../components/OfflineSnap";
+import DataExport from "../components/DataExport";
 ---
 
 <Layout title="Storm IQ | Command">
@@ -51,6 +54,13 @@ import QuietDay from "../components/QuietDay";
   <QuietDay client:only="react" />
   <GoNoGo client:only="react" />
   <HomeBase client:only="react" />
+
+  <div class="grid two" style="margin-bottom:0">
+    <ChaseLogPanel client:only="react" />
+    <OfflineSnapPanel client:only="react" />
+  </div>
+
+  <DataExport client:only="react" />
 
   <div class="card" style="margin-bottom:18px;border-color:rgba(82,224,208,0.28)">
     <div class="section-title">
