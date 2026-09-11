@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { loadHomeBase, type HomeBase } from "../lib/homeBase";
-import { loadRegions } from "../lib/regions";
-import { fetchStormReports } from "../lib/spc/lsrs";
+import { loadRegions } from "../lib/chaseRegions";
+import { fetchReports } from "../lib/lsr";
 import { fetchHrrrManifest, formatHrrrValid, layerReady, type HrrrManifest } from "../lib/hrrrOverlay";
 
 const CITIES = [
@@ -59,8 +59,8 @@ function severityColor(severity?: string): string {
 }
 
 function mapsUrl(lat: number, lng: number, home?: HomeBase | null) {
-  if (home) return `https://www.google.com/maps/dir/?api=1&origin=${home.lat},${home.lng}&destination=${lat},${lng}&travelmode=driving`;
-  return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+  if (home) return "https://www.google.com/maps/dir/?api=1&origin=" + home.lat + "," + home.lng + "&destination=" + lat + "," + lng + "&travelmode=driving";
+  return "https://www.google.com/maps/search/?api=1&query=" + lat + "," + lng;
 }
 
 function isDangerousEvent(event?: string): boolean {
@@ -131,11 +131,11 @@ export default function StormMap({ chaseMode = false }: { chaseMode?: boolean })
     });
     L.tileLayer(
       "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
-      { attribution: "Tiles (c) Esri", maxZoom: 16 }
+      { attribution: "Tiles Esri", maxZoom: 16 }
     ).addTo(map);
     const radar = L.tileLayer(
       "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png",
-      { attribution: "Radar (c) Iowa State Mesonet / NWS NEXRAD", opacity: 0.55, zIndex: 200, maxZoom: 12 }
+      { attribution: "Radar Iowa State Mesonet / NWS NEXRAD", opacity: 0.55, zIndex: 200, maxZoom: 12 }
     );
     radar.addTo(map);
     radarLayerRef.current = radar;
@@ -213,7 +213,6 @@ export default function StormMap({ chaseMode = false }: { chaseMode?: boolean })
       setStatus("Loading NWS + SPC...");
 
       try {
-        // SPC categorical
         try {
           const res = await fetch("https://www.spc.noaa.gov/products/outlook/day1otlk_cat.nolyr.geojson");
           if (res.ok) {
@@ -241,7 +240,6 @@ export default function StormMap({ chaseMode = false }: { chaseMode?: boolean })
           /* */
         }
 
-        // Hail outlook
         try {
           const res = await fetch("https://www.spc.noaa.gov/products/outlook/day1otlk_hail.nolyr.geojson");
           if (res.ok) {
@@ -256,7 +254,6 @@ export default function StormMap({ chaseMode = false }: { chaseMode?: boolean })
           /* */
         }
 
-        // Alerts
         const res = await fetch("https://api.weather.gov/alerts/active", {
           headers: {
             "User-Agent": "StormIQ (https://storm-iq.vercel.app)",
@@ -272,9 +269,13 @@ export default function StormMap({ chaseMode = false }: { chaseMode?: boolean })
             if ((event || "").toLowerCase().includes("test")) continue;
             const color = severityColor(p.severity);
             const detail =
-              `<strong>${event}</strong><br/>` +
+              "<strong>" +
+              event +
+              "</strong><br/>" +
               (p.headline || "") +
-              `<br/><span style="color:#8fa6a8">${(p.areaDesc || "").slice(0, 120)}</span>`;
+              "<br/><span style=\"color:#8fa6a8\">" +
+              (p.areaDesc || "").slice(0, 120) +
+              "</span>";
             if (showPolygons && hasDrawableGeometry(f.geometry)) {
               try {
                 L.geoJSON(f, {
@@ -313,14 +314,13 @@ export default function StormMap({ chaseMode = false }: { chaseMode?: boolean })
               n++;
             }
           }
-          setStatus(`${n} alert features · SPC outlook`);
+          setStatus(n + " alert features · SPC outlook");
         } else {
           setStatus("Alerts unavailable — outlook may still show");
         }
 
-        // Reports
         try {
-          const reports = await fetchStormReports(showYesterday);
+          const reports = await fetchReports({ includeYesterday: showYesterday });
           for (const r of reports) {
             const color =
               r.type === "tornado" ? "#ff2d55" : r.type === "hail" ? "#c084fc" : "#ffd166";
@@ -331,7 +331,14 @@ export default function StormMap({ chaseMode = false }: { chaseMode?: boolean })
               fillOpacity: r.day === "yesterday" ? 0.55 : 0.9,
               weight: 1.5,
             });
-            mk.bindPopup(`<strong>${r.type}</strong><br/>${r.location || ""}<br/>${r.detail || ""}`);
+            mk.bindPopup(
+              "<strong>" +
+                r.type +
+                "</strong><br/>" +
+                (r.location || "") +
+                "<br/>" +
+                (r.detail || "")
+            );
             mk.addTo(reportsLayerRef.current!);
           }
         } catch {
@@ -496,7 +503,16 @@ export default function StormMap({ chaseMode = false }: { chaseMode?: boolean })
     }
     setRouteInfo("Routing...");
     try {
-      const url = `https://router.project-osrm.org/route/v1/driving/${home.lng},${home.lat};${dest.lng},${dest.lat}?overview=full&geometries=geojson`;
+      const url =
+        "https://router.project-osrm.org/route/v1/driving/" +
+        home.lng +
+        "," +
+        home.lat +
+        ";" +
+        dest.lng +
+        "," +
+        dest.lat +
+        "?overview=full&geometries=geojson";
       const res = await fetch(url);
       if (!res.ok) throw new Error("fail");
       const data = await res.json();
@@ -512,7 +528,7 @@ export default function StormMap({ chaseMode = false }: { chaseMode?: boolean })
       const miles = Math.round((distance || 0) / 1609.34);
       const hPart = Math.floor(mins / 60);
       const mPart = mins % 60;
-      setRouteInfo(hPart ? `${hPart}h ${mPart}m · ${miles} mi` : `${mPart} min · ${miles} mi`);
+      setRouteInfo(hPart ? hPart + "h " + mPart + "m · " + miles + " mi" : mPart + " min · " + miles + " mi");
     } catch {
       const line = L.polyline(
         [
@@ -600,9 +616,9 @@ export default function StormMap({ chaseMode = false }: { chaseMode?: boolean })
         </button>
         <span style={{ fontSize: 11, color: "#8fa6a8" }}>
           {status}
-          {routeInfo ? ` · ${routeInfo}` : ""}
-          {lastRefresh ? ` · ${lastRefresh}` : ""}
-          {` · ${nextRefreshIn}s`}
+          {routeInfo ? " · " + routeInfo : ""}
+          {lastRefresh ? " · " + lastRefresh : ""}
+          {" · " + nextRefreshIn + "s"}
         </span>
       </div>
       {(hrrrReflOn || hrrrCapeOn) && (
