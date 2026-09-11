@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 import { loadHomeBase, type HomeBase } from "../lib/homeBase";
-import { fetchWxPoint, windDirLabel, type WxPoint } from "../lib/wxPoint";
+import {
+  fetchWxPoint,
+  mmToIn,
+  weatherCodeLabel,
+  windDirLabel,
+  type WxPoint,
+} from "../lib/wxPoint";
 
 const REFRESH_MS = 5 * 60_000;
 
@@ -49,12 +55,11 @@ export default function WxConditions() {
     };
   }, [home?.lat, home?.lng]);
 
-  // Content only — outer shell is on the Command page
   if (!home) {
     return (
       <p className="muted" style={{ fontSize: 13, lineHeight: 1.55, margin: 0 }}>
         No home base yet. Use the <strong style={{ color: "var(--lime)" }}>Home base</strong> card
-        above (Use my location or enter coordinates), then wind and clouds will load here.
+        above, then wind, clouds, and precip will load here.
       </p>
     );
   }
@@ -72,6 +77,10 @@ export default function WxConditions() {
   }
 
   if (!wx) return null;
+
+  const precipIn = mmToIn(wx.precipMm);
+  const precipLabel =
+    wx.precipMm <= 0 ? "0 in" : precipIn < 0.1 && wx.precipMm > 0 ? "<0.1 in" : precipIn + " in";
 
   return (
     <div>
@@ -94,10 +103,21 @@ export default function WxConditions() {
           sub="sky cover"
           color="#b8dde1"
         />
+        <Metric
+          label="PRECIP"
+          value={precipLabel}
+          sub={
+            wx.precipProbPct != null
+              ? Math.round(wx.precipProbPct) + "% chance this hour"
+              : weatherCodeLabel(wx.weatherCode)
+          }
+          color="#7eb6ff"
+        />
       </div>
       <p className="small muted" style={{ marginTop: 10 }}>
-        Open-Meteo at home base
+        {weatherCodeLabel(wx.weatherCode)} · Open-Meteo at home base
         {home.label ? " (" + home.label + ")" : ""}.
+        Rate is recent precipitation amount; chance is hourly probability.
         Auto-refresh ~5 min
         {updated ? " · last " + updated : ""}.
         Not a substitute for radar or NWS warnings.
