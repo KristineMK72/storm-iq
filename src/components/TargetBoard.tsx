@@ -479,6 +479,13 @@ export default function TargetBoard() {
                     {Math.round((wxById[item.id] as WxPoint).gustMph)} mph
                     {" · clouds "}
                     {Math.round((wxById[item.id] as WxPoint).cloudPct)}%
+                    {" · precip "}
+                    {(wxById[item.id] as WxPoint).precipMm > 0
+                      ? Math.round(((wxById[item.id] as WxPoint).precipMm / 25.4) * 100) / 100 + " in"
+                      : "0 in"}
+                    {(wxById[item.id] as WxPoint).precipProbPct != null
+                      ? " · " + Math.round((wxById[item.id] as WxPoint).precipProbPct as number) + "% chance"
+                      : ""}
                   </div>
                 )}
                 {item.description && (
