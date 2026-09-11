@@ -54,7 +54,6 @@ function formatRemaining(mins: number | null): string {
   return m ? `${h}h ${m}m left` : `${h}h left`;
 }
 
-/** Parse SPC Day 1 Valid 111300Z - 121200Z */
 function parseSpcValid(text: string): string {
   const m = text.match(/Valid\s+(\d{6})Z\s*-\s*(\d{6})Z/i);
   if (!m) return "Day 1 period (see SPC)";
@@ -67,7 +66,6 @@ function extractSummary(text: string): string {
   return "";
 }
 
-/** Pull short timing-ish lines from SPC text */
 function extractTimingCues(text: string): string[] {
   const cues: string[] = [];
   const patterns = [
@@ -125,7 +123,7 @@ function computePosture(
   if (upcomingWatches.length > 0) {
     const next = upcomingWatches
       .slice()
-      .sort((a, b) => (a.onset!.getTime() - b.onset!.getTime()))[0];
+      .sort((a, b) => a.onset!.getTime() - b.onset!.getTime())[0];
     const mins = minsUntil(next.onset, now);
     return {
       posture: "STAGING",
@@ -193,7 +191,6 @@ export default function ChaseTiming() {
             const event = p.event || "Alert";
             const el = event.toLowerCase();
             if (el.includes("test") || p.status === "Test") continue;
-            // Focus severe / hydro timing that matters for chase days
             const interesting =
               el.includes("tornado") ||
               el.includes("severe thunderstorm") ||
@@ -210,7 +207,6 @@ export default function ChaseTiming() {
 
             const onset = parseIso(p.onset || p.effective);
             const expires = parseIso(p.expires);
-            // Skip long-expired
             if (expires && expires.getTime() < now.getTime() - 30 * 60000) continue;
 
             windows.push({
@@ -225,7 +221,6 @@ export default function ChaseTiming() {
           }
         }
 
-        // Sort: warnings first, then by soonest onset/expiry
         windows.sort((a, b) => {
           if (a.kind !== b.kind) {
             if (a.kind === "warning") return -1;
@@ -271,21 +266,13 @@ export default function ChaseTiming() {
   const now = new Date();
 
   return (
-    <div
-      className="card"
-      style={{
-        marginBottom: 18,
-        borderColor: "rgba(217,255,74,0.28)",
-      }}
-    >
-      <div className="section-title">
-        <div>
-          <div className="eyebrow">Chase day clock</div>
-          <h2>Timing</h2>
-        </div>
-        <span className="small muted">
-          {state.status === "loading" ? "LOADING…" : state.status === "error" ? "RETRY" : "LIVE"}
-        </span>
+    <div>
+      <div className="small muted" style={{ marginBottom: 8 }}>
+        {state.status === "loading"
+          ? "Loading timing…"
+          : state.status === "error"
+          ? "Could not refresh — try again shortly"
+          : "LIVE · updates ~90s"}
       </div>
 
       <div
@@ -329,7 +316,15 @@ export default function ChaseTiming() {
           <div className="small muted" style={{ marginBottom: 6 }}>
             Timing cues (from SPC Day 1 text)
           </div>
-          <ul style={{ margin: 0, paddingLeft: 18, color: "var(--muted)", fontSize: 12, lineHeight: 1.5 }}>
+          <ul
+            style={{
+              margin: 0,
+              paddingLeft: 18,
+              color: "var(--muted)",
+              fontSize: 12,
+              lineHeight: 1.5,
+            }}
+          >
             {state.cues.map((c, i) => (
               <li key={i} style={{ marginBottom: 4 }}>
                 {c}
@@ -368,7 +363,14 @@ export default function ChaseTiming() {
               background: "rgba(0,0,0,0.22)",
             }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 8,
+                flexWrap: "wrap",
+              }}
+            >
               <strong style={{ fontSize: 13 }}>{w.event}</strong>
               <span
                 className="small"
@@ -394,7 +396,6 @@ export default function ChaseTiming() {
       <p className="small muted" style={{ marginTop: 10 }}>
         Timing is guidance from official NWS/SPC products — not a guarantee of initiation.
         Always defer to the latest watches, warnings, and local office updates.
-        {state.nowLabel ? ` · Refreshed context ${state.nowLabel}` : ""}
       </p>
 
       <div style={{ marginTop: 8 }}>
