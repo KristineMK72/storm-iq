@@ -7,6 +7,7 @@ import {
 } from "../lib/homeBase";
 import { focusMap } from "../lib/mapFocus";
 import { addChaseLog } from "../lib/chaseLog";
+import { fetchWxPoint, windDirLabel, type WxPoint } from "../lib/wxPoint";
 
 type BoardItem = {
   id: string;
@@ -148,6 +149,7 @@ export default function TargetBoard() {
   const [nearMe, setNearMe] = useState(false);
   const [shareNote, setShareNote] = useState("");
   const [filter, setFilter] = useState<"all" | "warnings" | "watches" | "outlooks">("all");
+  const [wxById, setWxById] = useState<Record<string, WxPoint | "loading" | "error">>({});
 
   useEffect(() => {
     setHome(loadHomeBase());
@@ -393,6 +395,12 @@ export default function TargetBoard() {
                     lat: item.lat,
                     lng: item.lng,
                   });
+                  if (item.lat != null && item.lng != null && !wxById[item.id]) {
+                    setWxById((m) => ({ ...m, [item.id]: "loading" }));
+                    fetchWxPoint(item.lat, item.lng)
+                      .then((p) => setWxById((m) => ({ ...m, [item.id]: p })))
+                      .catch(() => setWxById((m) => ({ ...m, [item.id]: "error" })));
+                  }
                 }
               }}
               className="target-row"
@@ -445,6 +453,34 @@ export default function TargetBoard() {
                 <div style={{ marginBottom: 10, color: "var(--muted)", fontSize: 12 }}>
                   {item.areaDesc || "—"}
                 </div>
+                {wxById[item.id] === "loading" && (
+                  <p className="small muted">Loading wind / clouds…</p>
+                )}
+                {wxById[item.id] === "error" && (
+                  <p className="small muted">Surface weather unavailable</p>
+                )}
+                {wxById[item.id] && typeof wxById[item.id] === "object" && (
+                  <div
+                    className="small"
+                    style={{
+                      marginBottom: 10,
+                      padding: "8px 10px",
+                      borderRadius: 8,
+                      border: "1px solid var(--line)",
+                      background: "rgba(82,224,208,0.06)",
+                      color: "var(--muted)",
+                    }}
+                  >
+                    <strong style={{ color: "#52e0d0" }}>Surface @ target</strong>
+                    {" · "}
+                    {Math.round((wxById[item.id] as WxPoint).windMph)} mph{" "}
+                    {windDirLabel((wxById[item.id] as WxPoint).windDirDeg)}
+                    {" · gusts "}
+                    {Math.round((wxById[item.id] as WxPoint).gustMph)} mph
+                    {" · clouds "}
+                    {Math.round((wxById[item.id] as WxPoint).cloudPct)}%
+                  </div>
+                )}
                 {item.description && (
                   <pre
                     style={{
