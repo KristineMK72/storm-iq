@@ -65,14 +65,41 @@ import WxConditions from "../components/WxConditions";
     </div>
     <p class="muted" style="font-size:13px;line-height:1.55;margin:0 0 12px">
       Posture for the day (staging / in window), SPC Day 1 valid period, and
-      severe watch–warning clocks. Scroll this card for live detail.
+      severe watch–warning clocks.
     </p>
     <ChaseTiming client:only="react" />
   </div>
 
   <GoNoGo client:only="react" />
-  <HomeBase client:only="react" />
-  <WxConditions client:only="react" />
+
+  <div id="home-base" class="card" style="margin-bottom:18px">
+    <div class="section-title">
+      <div>
+        <div class="eyebrow">Your location</div>
+        <h2>Home base</h2>
+      </div>
+      <span class="small muted">REQUIRED FOR WIND</span>
+    </div>
+    <p class="muted" style="font-size:13px;line-height:1.55;margin:0 0 10px">
+      Set this first — wind, clouds, ETAs, and near-me all use home base.
+    </p>
+    <HomeBase client:only="react" />
+  </div>
+
+  <div id="wind-clouds" class="card" style="margin-bottom:18px;border-color:rgba(82,224,208,0.4)">
+    <div class="section-title">
+      <div>
+        <div class="eyebrow">Surface conditions</div>
+        <h2>Wind &amp; clouds</h2>
+      </div>
+      <span class="small muted">AUTO 5 MIN</span>
+    </div>
+    <p class="muted" style="font-size:13px;line-height:1.55;margin:0 0 12px">
+      Live wind speed, direction, gusts, and cloud cover at your home base.
+      Numbers appear after home base is set. Auto-refreshes about every 5 minutes.
+    </p>
+    <WxConditions client:only="react" />
+  </div>
 
   <div class="grid two" style="margin-bottom:0">
     <ChaseLogPanel client:only="react" />
