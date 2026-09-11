@@ -23,6 +23,7 @@ import DataExport from "../components/DataExport";
 import WxConditions from "../components/WxConditions";
 import LowSignalMode from "../components/LowSignalMode";
 import VoiceReadouts from "../components/VoiceReadouts";
+import ModelAtPoint from "../components/ModelAtPoint";
 ---
 
 <Layout title="Storm IQ | Command">
@@ -83,7 +84,7 @@ import VoiceReadouts from "../components/VoiceReadouts";
       <span class="small muted">REQUIRED FOR WIND</span>
     </div>
     <p class="muted" style="font-size:13px;line-height:1.55;margin:0 0 10px">
-      Set this first — wind, clouds, ETAs, voice, and near-me all use home base.
+      Set this first — wind, clouds, model timeline, ETAs, and voice all use home base.
     </p>
     <HomeBase client:only="react" />
   </div>
@@ -101,6 +102,8 @@ import VoiceReadouts from "../components/VoiceReadouts";
     </p>
     <WxConditions client:only="react" />
   </div>
+
+  <ModelAtPoint client:only="react" />
 
   <LowSignalMode client:only="react" />
   <VoiceReadouts client:only="react" />
