@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { loadHomeBase } from "../lib/homeBase";
-import { milesBetween } from "../lib/homeBase";
+import { loadHomeBase, milesBetween } from "../lib/homeBase";
 
 const KEY = "stormiq-voice-readouts";
 const SEEN_KEY = "stormiq-voice-seen";
@@ -32,7 +31,7 @@ function loadSeen(): Set<string> {
 
 function saveSeen(set: Set<string>) {
   try {
-    localStorage.setItem(SEEN_KEY, JSON.stringify([...set].slice(-80));
+    localStorage.setItem(SEEN_KEY, JSON.stringify([...set].slice(-80)));
   } catch {
     // ignore
   }
@@ -113,7 +112,7 @@ export default function VoiceReadouts() {
           const isFfw = el.includes("flash flood warning");
           if (!isTor && !isSvr && !isFfw) continue;
 
-          const id = String(f.id || p.headline || event + p.areaDesc);
+          const id = String(f.id || p.headline || event + (p.areaDesc || ""));
           if (seenRef.current.has(id)) continue;
 
           const center = getCentroid(f.geometry);
@@ -125,8 +124,13 @@ export default function VoiceReadouts() {
           saveSeen(seenRef.current);
 
           const area = (p.areaDesc || "your area").split(";")[0].trim().slice(0, 40);
+          const kind = isTor
+            ? "Tornado warning"
+            : isFfw
+            ? "Flash flood warning"
+            : "Severe thunderstorm warning";
           const line =
-            (isTor ? "Tornado warning" : isFfw ? "Flash flood warning" : "Severe thunderstorm warning") +
+            kind +
             " near " +
             area +
             ". About " +
@@ -135,7 +139,7 @@ export default function VoiceReadouts() {
 
           setLast(line);
           speak(line);
-          break; // one readout per poll cycle
+          break;
         }
       } catch {
         // ignore
@@ -143,7 +147,7 @@ export default function VoiceReadouts() {
     }
 
     poll();
-    const id = window.setInterval(poll, 90_000);
+    const id = window.setInterval(poll, 90000);
     return () => {
       cancelled = true;
       window.clearInterval(id);
@@ -160,10 +164,10 @@ export default function VoiceReadouts() {
       }
       if (next) {
         speak("Storm IQ voice readouts on. Near me warnings will be spoken.");
-        setLast("Voice on — listening for TOR / SVR / FFW within " + RADIUS_MI + " mi");
+        setLast("Voice on — TOR / SVR / FFW within " + RADIUS_MI + " mi");
       } else {
         try {
-          window.speechSynthesis?.cancel();
+          window.speechSynthesis.cancel();
         } catch {
           // ignore
         }
@@ -174,7 +178,9 @@ export default function VoiceReadouts() {
   }
 
   function test() {
-    speak("Storm IQ test. Tornado warning example near your home base. This is only a test.");
+    speak(
+      "Storm IQ test. Tornado warning example near your home base. This is only a test."
+    );
     setLast("Played test readout");
   }
 
@@ -190,8 +196,8 @@ export default function VoiceReadouts() {
 
       <p className="muted" style={{ fontSize: 13, lineHeight: 1.55, margin: "0 0 12px" }}>
         Speaks new tornado, severe thunderstorm, and flash flood warnings within about{" "}
-        {RADIUS_MI} miles of home base. Keep the tab open. Unmute your phone. Official NWS products
-        always win.
+        {RADIUS_MI} miles of home base. Keep the tab open and unmute the phone. Official NWS
+        products always win.
       </p>
 
       {!supported && (
@@ -218,11 +224,11 @@ export default function VoiceReadouts() {
         </button>
       </div>
 
-      {last && (
+      {last ? (
         <p className="small muted" style={{ marginTop: 10 }}>
           Last: {last}
         </p>
-      )}
+      ) : null}
     </div>
   );
 }

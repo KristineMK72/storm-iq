@@ -21,6 +21,8 @@ import ChaseLogPanel from "../components/ChaseLog";
 import OfflineSnapPanel from "../components/OfflineSnap";
 import DataExport from "../components/DataExport";
 import WxConditions from "../components/WxConditions";
+import LowSignalMode from "../components/LowSignalMode";
+import VoiceReadouts from "../components/VoiceReadouts";
 ---
 
 <Layout title="Storm IQ | Command">
@@ -81,7 +83,7 @@ import WxConditions from "../components/WxConditions";
       <span class="small muted">REQUIRED FOR WIND</span>
     </div>
     <p class="muted" style="font-size:13px;line-height:1.55;margin:0 0 10px">
-      Set this first — wind, clouds, ETAs, and near-me all use home base.
+      Set this first — wind, clouds, ETAs, voice, and near-me all use home base.
     </p>
     <HomeBase client:only="react" />
   </div>
@@ -95,11 +97,13 @@ import WxConditions from "../components/WxConditions";
       <span class="small muted">AUTO 5 MIN</span>
     </div>
     <p class="muted" style="font-size:13px;line-height:1.55;margin:0 0 12px">
-      Live wind speed, direction, gusts, and cloud cover at your home base.
-      Numbers appear after home base is set. Auto-refreshes about every 5 minutes.
+      Live wind, gusts, clouds, and precip at home base. Auto-refreshes ~5 minutes.
     </p>
     <WxConditions client:only="react" />
   </div>
+
+  <LowSignalMode client:only="react" />
+  <VoiceReadouts client:only="react" />
 
   <div class="grid two" style="margin-bottom:0">
     <ChaseLogPanel client:only="react" />
