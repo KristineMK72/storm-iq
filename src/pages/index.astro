@@ -20,6 +20,7 @@ import ChaseTiming from "../components/ChaseTiming";
 import ChaseLogPanel from "../components/ChaseLog";
 import OfflineSnapPanel from "../components/OfflineSnap";
 import DataExport from "../components/DataExport";
+import WxConditions from "../components/WxConditions";
 ---
 
 <Layout title="Storm IQ | Command">
@@ -54,7 +55,6 @@ import DataExport from "../components/DataExport";
   <ThreatStrip client:only="react" />
   <QuietDay client:only="react" />
 
-  <!-- Always-visible shell so Timing is easy to find after deploy -->
   <div id="chase-timing" class="card" style="margin-bottom:18px;border-color:rgba(217,255,74,0.35)">
     <div class="section-title">
       <div>
@@ -72,6 +72,7 @@ import DataExport from "../components/DataExport";
 
   <GoNoGo client:only="react" />
   <HomeBase client:only="react" />
+  <WxConditions client:only="react" />
 
   <div class="grid two" style="margin-bottom:0">
     <ChaseLogPanel client:only="react" />
