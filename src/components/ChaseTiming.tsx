@@ -28,7 +28,7 @@ function parseIso(s?: string | null): Date | null {
 }
 
 function fmtLocal(d: Date | null): string {
-  if (!d) return "—";
+  if (!d) return "-";
   try {
     return d.toLocaleString(undefined, {
       weekday: "short",
@@ -48,21 +48,21 @@ function minsUntil(d: Date | null, now: Date): number | null {
 function formatRemaining(mins: number | null): string {
   if (mins == null) return "";
   if (mins <= 0) return "ended / ending";
-  if (mins < 60) return `${mins}m left`;
+  if (mins < 60) return mins + "m left";
   const h = Math.floor(mins / 60);
   const m = mins % 60;
-  return m ? `${h}h ${m}m left` : `${h}h left`;
+  return m ? h + "h " + m + "m left" : h + "h left";
 }
 
 function parseSpcValid(text: string): string {
   const m = text.match(/Valid\s+(\d{6})Z\s*-\s*(\d{6})Z/i);
   if (!m) return "Day 1 period (see SPC)";
-  return `Valid ${m[1]}Z – ${m[2]}Z`;
+  return "Valid " + m[1] + "Z - " + m[2] + "Z";
 }
 
 function extractSummary(text: string): string {
   const m = text.match(/\.\.\.SUMMARY\.\.\.\s*([\s\S]*?)(?:\n\s*\n|\.\.\.[A-Z])/i);
-  if (m?.[1]) return m[1].replace(/\s+/g, " ").trim().slice(0, 320);
+  if (m && m[1]) return m[1].replace(/\s+/g, " ").trim().slice(0, 320);
   return "";
 }
 
@@ -110,14 +110,18 @@ function computePosture(
 
   if (liveWarnings.length > 0) {
     return {
-      posture: "IN WINDOW · WARNINGS",
-      detail: `${liveWarnings.length} active warning(s) — priority is official NWS guidance and safety.`,
+      posture: "IN WINDOW - WARNINGS",
+      detail:
+        liveWarnings.length +
+        " active warning(s) - priority is official NWS guidance and safety.",
     };
   }
   if (activeWatches.length > 0) {
     return {
-      posture: "IN WINDOW · WATCHES",
-      detail: `${activeWatches.length} watch(es) in effect — favored period is underway; stay flexible.`,
+      posture: "IN WINDOW - WATCHES",
+      detail:
+        activeWatches.length +
+        " watch(es) in effect - favored period is underway; stay flexible.",
     };
   }
   if (upcomingWatches.length > 0) {
@@ -127,25 +131,32 @@ function computePosture(
     const mins = minsUntil(next.onset, now);
     return {
       posture: "STAGING",
-      detail: `Next watch onset ~${fmtLocal(next.onset)} (${formatRemaining(mins)}). Use this time for positioning — not core penetration.`,
+      detail:
+        "Next watch onset ~" +
+        fmtLocal(next.onset) +
+        " (" +
+        formatRemaining(mins) +
+        "). Use this time for positioning - not core penetration.",
     };
   }
   if (cues.some((c) => /afternoon|evening|tonight|22-|00Z|01Z/i.test(c))) {
     return {
-      posture: "PLANNING · DAY 1 SIGNAL",
-      detail: "SPC discussion suggests later timing. Watches may still be issued — keep checking.",
+      posture: "PLANNING - DAY 1 SIGNAL",
+      detail:
+        "SPC discussion suggests later timing. Watches may still be issued - keep checking.",
     };
   }
   return {
     posture: "MONITOR",
-    detail: "No severe watches/warnings in the timing board right now. Outlook may still evolve.",
+    detail:
+      "No severe watches/warnings in the timing board right now. Outlook may still evolve.",
   };
 }
 
 export default function ChaseTiming() {
   const [state, setState] = useState<TimingState>({
     status: "loading",
-    posture: "…",
+    posture: "...",
     postureDetail: "",
     spcValid: "",
     spcSummary: "",
@@ -186,7 +197,7 @@ export default function ChaseTiming() {
         const windows: WindowItem[] = [];
         if (alertsRes.ok) {
           const data = await alertsRes.json();
-          for (const f of data?.features || []) {
+          for (const f of data.features || []) {
             const p = f.properties || {};
             const event = p.event || "Alert";
             const el = event.toLowerCase();
@@ -210,7 +221,7 @@ export default function ChaseTiming() {
             if (expires && expires.getTime() < now.getTime() - 30 * 60000) continue;
 
             windows.push({
-              id: f.id || `${event}-${p.areaDesc}`,
+              id: f.id || event + "-" + (p.areaDesc || ""),
               event,
               area: (p.areaDesc || "Multiple areas").split(";")[0].trim().slice(0, 48),
               onset,
@@ -256,7 +267,7 @@ export default function ChaseTiming() {
     }
 
     load();
-    const id = window.setInterval(load, 90_000);
+    const id = window.setInterval(load, 90000);
     return () => {
       cancelled = true;
       window.clearInterval(id);
@@ -269,10 +280,10 @@ export default function ChaseTiming() {
     <div>
       <div className="small muted" style={{ marginBottom: 8 }}>
         {state.status === "loading"
-          ? "Loading timing…"
+          ? "Loading timing..."
           : state.status === "error"
-          ? "Could not refresh — try again shortly"
-          : "LIVE · updates ~90s"}
+          ? "Could not refresh - try again shortly"
+          : "LIVE - updates ~90s"}
       </div>
 
       <div
@@ -296,22 +307,25 @@ export default function ChaseTiming() {
           {state.posture}
         </div>
         <p className="muted" style={{ fontSize: 13, lineHeight: 1.5, margin: "6px 0 0" }}>
-          {state.postureDetail || "Assessing watches, warnings, and SPC Day 1 timing…"}
+          {state.postureDetail ||
+            "Assessing watches, warnings, and SPC Day 1 timing..."}
         </p>
       </div>
 
       <div style={{ marginBottom: 12 }}>
         <div className="small muted">SPC Day 1 valid</div>
-        <div style={{ fontWeight: 700, fontSize: 14 }}>{state.spcValid || "—"}</div>
-        {state.spcSummary && (
+        <div style={{ fontWeight: 700, fontSize: 14 }}>
+          {state.spcValid || "-"}
+        </div>
+        {state.spcSummary ? (
           <p className="muted" style={{ fontSize: 12, lineHeight: 1.5, margin: "6px 0 0" }}>
             {state.spcSummary}
-            {state.spcSummary.length >= 300 ? "…” : ""}
+            {state.spcSummary.length >= 300 ? "..." : ""}
           </p>
-        )}
+        ) : null}
       </div>
 
-      {state.cues.length > 0 && (
+      {state.cues.length > 0 ? (
         <div style={{ marginBottom: 12 }}>
           <div className="small muted" style={{ marginBottom: 6 }}>
             Timing cues (from SPC Day 1 text)
@@ -332,17 +346,17 @@ export default function ChaseTiming() {
             ))}
           </ul>
         </div>
-      )}
+      ) : null}
 
       <div className="small muted" style={{ marginBottom: 6 }}>
-        Watches &amp; warnings (severe / flood focus)
+        Watches and warnings (severe / flood focus)
       </div>
 
-      {!state.windows.length && state.status === "ready" && (
+      {!state.windows.length && state.status === "ready" ? (
         <p className="muted" style={{ fontSize: 13 }}>
           No tornado/severe/flash-flood watches or warnings in the timing list right now.
         </p>
-      )}
+      ) : null}
 
       {state.windows.map((w) => {
         const left = formatRemaining(minsUntil(w.expires, now));
@@ -356,7 +370,7 @@ export default function ChaseTiming() {
           <div
             key={w.id}
             style={{
-              border: `1px solid ${border}`,
+              border: "1px solid " + border,
               borderRadius: 10,
               padding: "10px 12px",
               marginBottom: 8,
@@ -380,21 +394,21 @@ export default function ChaseTiming() {
                 }}
               >
                 {w.kind.toUpperCase()}
-                {left ? ` · ${left}` : ""}
+                {left ? " - " + left : ""}
               </span>
             </div>
             <div className="small muted" style={{ marginTop: 4 }}>
               {w.area}
             </div>
             <div className="small muted" style={{ marginTop: 4 }}>
-              Onset {fmtLocal(w.onset)} → Until {fmtLocal(w.expires)}
+              Onset {fmtLocal(w.onset)} - Until {fmtLocal(w.expires)}
             </div>
           </div>
         );
       })}
 
       <p className="small muted" style={{ marginTop: 10 }}>
-        Timing is guidance from official NWS/SPC products — not a guarantee of initiation.
+        Timing is guidance from official NWS/SPC products - not a guarantee of initiation.
         Always defer to the latest watches, warnings, and local office updates.
       </p>
 
@@ -405,7 +419,7 @@ export default function ChaseTiming() {
           rel="noopener noreferrer"
           style={{ fontSize: 12, fontWeight: 700, color: "var(--cyan)" }}
         >
-          Full Day 1 discussion →
+          Full Day 1 discussion
         </a>
       </div>
     </div>
