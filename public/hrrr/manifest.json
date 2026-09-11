@@ -1,0 +1,24 @@
+{
+  "updated": "2026-09-11T00:00:00Z",
+  "valid": null,
+  "model": "HRRR",
+  "run": null,
+  "forecastHour": null,
+  "bounds": [
+    [24.2, -125.0],
+    [49.5, -66.5]
+  ],
+  "layers": {
+    "refl": {
+      "url": "",
+      "opacity": 0.55,
+      "label": "Simulated reflectivity"
+    },
+    "cape": {
+      "url": "",
+      "opacity": 0.45,
+      "label": "MLCAPE"
+    }
+  },
+  "note": "No HRRR frames published yet. Wire a renderer to fill layer URLs. Model guidance only."
+}
