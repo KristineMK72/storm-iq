@@ -1,8 +1,8 @@
+# cfgrib talks to system libeccodes (apt/brew) — do NOT pip install eccodes
 herbie-data>=2024.1.0
 cfgrib>=0.9.10
 xarray>=2024.1.0
 matplotlib>=3.8.0
-cartopy>=0.22.0
 numpy>=1.26.0
 pillow>=10.0.0
-ecodes>=1.6.0
+# cartopy is optional; skip on CI if it bloats the install
