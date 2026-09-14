@@ -1,24 +1,30 @@
 {
-  "updated": "2026-09-11T00:00:00Z",
-  "valid": null,
+  "updated": "2026-09-14T04:59:24Z",
+  "valid": "2026-09-14T05:59:17Z",
   "model": "HRRR",
-  "run": null,
-  "forecastHour": null,
+  "run": "20260914_04",
+  "forecastHour": 1,
   "bounds": [
-    [24.2, -125.0],
-    [49.5, -66.5]
+    [
+      24.2,
+      -125.0
+    ],
+    [
+      49.5,
+      -66.5
+    ]
   ],
   "layers": {
     "refl": {
-      "url": "",
+      "url": "/hrrr/refl.png",
       "opacity": 0.55,
       "label": "Simulated reflectivity"
     },
     "cape": {
-      "url": "",
+      "url": "/hrrr/cape.png",
       "opacity": 0.45,
-      "label": "MLCAPE"
+      "label": "Surface/mixed CAPE"
     }
   },
-  "note": "No HRRR frames published yet. Wire a renderer to fill layer URLs. Model guidance only."
+  "note": "Model guidance only \u2014 not observations or NWS warnings."
 }
