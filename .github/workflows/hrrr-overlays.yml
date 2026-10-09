@@ -78,7 +78,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add public/hrrr/manifest.json public/hrrr/refl.png public/hrrr/cape.png public/hrrr/refl_f*.png || true
+          git add public/hrrr/ || true
           if git diff --staged --quiet; then
             echo "No overlay changes to commit"
           else
