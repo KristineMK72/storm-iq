@@ -8,12 +8,10 @@ for Leaflet imageOverlay (see docs/HRRR_OVERLAY_API.md).
 Usage:
   python render_hrrr_overlays.py
   python render_hrrr_overlays.py --out ../../public/hrrr --fxx 1
-  python render_hrrr_overlays.py --model hrrr --product sfc
+  python render_hrrr_overlays.py --anim-hours 1,3,6
 
 Requires: pip install -r requirements.txt
 System: eccodes (for cfgrib) — on macOS: brew install eccodes
-
-Note: First Herbie downloads can be large. Needs network + disk cache.
 """
 
 from __future__ import annotations
@@ -25,47 +23,24 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-# CONUS geographic bounds — must match Storm IQ Leaflet overlay
-# [[south, west], [north, east]]
 BOUNDS_LATLON = [[24.2, -125.0], [49.5, -66.5]]
-EXTENT = [-125.0, -66.5, 24.2, 49.5]  # west, east, south, north for imshow
+EXTENT = [-125.0, -66.5, 24.2, 49.5]
 
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Render HRRR overlays for Storm IQ")
+    p.add_argument("--out", type=Path, default=Path(__file__).resolve().parents[2] / "public" / "hrrr")
+    p.add_argument("--fxx", type=int, default=1, help="Primary forecast hour (default 1)")
     p.add_argument(
-        "--out",
-        type=Path,
-        default=Path(__file__).resolve().parents[2] / "public" / "hrrr",
-        help="Output directory for PNGs + manifest.json",
+        "--anim-hours",
+        default="1,3,6",
+        help="Comma-separated fxx values for multi-hour refl animation (default 1,3,6)",
     )
-    p.add_argument("--fxx", type=int, default=1, help="Forecast hour (default 1)")
-    p.add_argument(
-        "--model",
-        default="hrrr",
-        help="Herbie model name (default hrrr)",
-    )
-    p.add_argument(
-        "--product",
-        default="sfc",
-        help="Herbie product (sfc recommended)",
-    )
-    p.add_argument(
-        "--dpi",
-        type=int,
-        default=120,
-        help="Figure DPI (higher = larger PNG)",
-    )
-    p.add_argument(
-        "--skip-cape",
-        action="store_true",
-        help="Only render simulated reflectivity",
-    )
-    p.add_argument(
-        "--skip-refl",
-        action="store_true",
-        help="Only render CAPE",
-    )
+    p.add_argument("--model", default="hrrr")
+    p.add_argument("--product", default="sfc")
+    p.add_argument("--dpi", type=int, default=120)
+    p.add_argument("--skip-cape", action="store_true")
+    p.add_argument("--skip-refl", action="store_true")
     return p.parse_args()
 
 
@@ -83,59 +58,41 @@ def ensure_deps():
 
 
 def _candidate_dates():
-    """Yield date strings to try: 'now' first, then recent hourly cycles."""
     yield "now"
     utc = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
-    # HRRR cycles every hour; try the last several hours in case the
-    # newest inventory endpoints are empty or rate-limited.
     for hours_ago in range(1, 7):
         dt = utc - timedelta(hours=hours_ago)
         yield dt.strftime("%Y-%m-%d %H:%M")
 
 
 def open_hrrr(model: str, product: str, fxx: int, retries_per_date: int = 2):
-    """Initialize Herbie, trying 'now' then recent cycles with retries."""
     from herbie import Herbie
 
     last_err = None
-    # Prefer reliable cloud archives; NOMADS can be flaky near cycle boundaries
     priority = ["aws", "google", "azure", "nomads"]
 
     for date in _candidate_dates():
         for attempt in range(1, retries_per_date + 1):
             try:
-                H = Herbie(
-                    date,
-                    model=model,
-                    product=product,
-                    fxx=fxx,
-                    priority=priority,
-                )
-                # Confirm a source was actually found
+                H = Herbie(date, model=model, product=product, fxx=fxx, priority=priority)
                 if getattr(H, "grib", None) is None and not getattr(H, "SOURCES", None):
                     raise RuntimeError(f"No GRIB source found for date={date}")
                 print(f"Herbie: model={model} product={product} fxx={fxx} date={date}")
-                print(
-                    f"  date={H.date}  remote={getattr(H, 'grib', None) or getattr(H, 'SOURCES', '')}"
-                )
+                print(f"  date={H.date}  remote={getattr(H, 'grib', None) or getattr(H, 'SOURCES', '')}")
                 return H
             except Exception as e:
                 last_err = e
                 print(f"  Herbie({date!r}) attempt {attempt}/{retries_per_date} failed: {e}")
                 if attempt < retries_per_date:
                     time.sleep(10 * attempt)
-
     raise last_err
 
 
 def load_field(H, search: str):
-    """Return xarray DataArray for first matching GRIB field."""
     ds = H.xarray(search)
-    # Herbie sometimes returns Dataset or list
     if isinstance(ds, list):
         ds = ds[0]
     if hasattr(ds, "data_vars"):
-        # pick first data var
         name = list(ds.data_vars)[0]
         da = ds[name]
     else:
@@ -144,10 +101,6 @@ def load_field(H, search: str):
 
 
 def field_to_latlon_grid(da):
-    """
-    Best-effort extract 2D values + lat/lon.
-    HRRR is usually Lambert; Herbie/cfgrib may expose latitude/longitude coords.
-    """
     import numpy as np
 
     vals = np.asarray(da.values, dtype=float)
@@ -166,7 +119,6 @@ def field_to_latlon_grid(da):
             break
 
     if lat is None or lon is None:
-        # Some cfgrib layouts nest under different names
         for c in da.coords:
             cl = c.lower()
             if "lat" in cl and lat is None:
@@ -180,19 +132,7 @@ def field_to_latlon_grid(da):
     return vals, lat, lon
 
 
-def render_conus_png(
-    vals,
-    lat,
-    lon,
-    out_path: Path,
-    *,
-    vmin,
-    vmax,
-    cmap: str,
-    dpi: int,
-    title: str,
-):
-    import numpy as np
+def render_conus_png(vals, lat, lon, out_path: Path, *, vmin, vmax, cmap: str, dpi: int, title: str):
     import matplotlib
 
     matplotlib.use("Agg")
@@ -200,7 +140,6 @@ def render_conus_png(
     from matplotlib.colors import Normalize
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-
     fig, ax = plt.subplots(figsize=(12, 7), dpi=dpi)
     ax.set_xlim(EXTENT[0], EXTENT[1])
     ax.set_ylim(EXTENT[2], EXTENT[3])
@@ -208,46 +147,15 @@ def render_conus_png(
     ax.axis("off")
     fig.patch.set_alpha(0.0)
     ax.patch.set_alpha(0.0)
-
     norm = Normalize(vmin=vmin, vmax=vmax)
 
     if lat is not None and lon is not None and lat.shape == vals.shape and lon.shape == vals.shape:
-        # Scatter/pcolormesh with native lat/lon
-        mesh = ax.pcolormesh(
-            lon,
-            lat,
-            vals,
-            shading="auto",
-            cmap=cmap,
-            norm=norm,
-            alpha=0.85,
-        )
+        ax.pcolormesh(lon, lat, vals, shading="auto", cmap=cmap, norm=norm, alpha=0.85)
     else:
-        # Fallback: stretch array across CONUS extent (approximate)
         print("  warning: no lat/lon coords — using extent stretch (approximate)")
-        mesh = ax.imshow(
-            vals,
-            origin="upper",
-            extent=EXTENT,
-            cmap=cmap,
-            norm=norm,
-            alpha=0.85,
-            aspect="auto",
-        )
+        ax.imshow(vals, origin="upper", extent=EXTENT, cmap=cmap, norm=norm, alpha=0.85, aspect="auto")
 
-    # Transparent below useful signal for refl-like fields
-    if cmap in ("gist_ncar", "NWSRef", "turbo"):
-        # leave as-is; user can tune
-        pass
-
-    plt.savefig(
-        out_path,
-        dpi=dpi,
-        bbox_inches="tight",
-        pad_inches=0,
-        transparent=True,
-        facecolor="none",
-    )
+    plt.savefig(out_path, dpi=dpi, bbox_inches="tight", pad_inches=0, transparent=True, facecolor="none")
     plt.close(fig)
     print(f"  wrote {out_path} ({out_path.stat().st_size // 1024} KB)")
 
@@ -258,12 +166,37 @@ def iso_z(dt: datetime) -> str:
     return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def render_refl(H, out_path: Path, dpi: int) -> bool:
+    for search in (":REFC:", ":REFD:1000", ":REF"):
+        try:
+            print(f"Loading refl search {search!r}...")
+            da = load_field(H, search)
+            vals, lat, lon = field_to_latlon_grid(da)
+            render_conus_png(vals, lat, lon, out_path, vmin=0, vmax=75, cmap="gist_ncar", dpi=dpi, title="HRRR REFC")
+            return True
+        except Exception as e:
+            print(f"  refl search failed: {e}")
+    return False
+
+
 def main() -> int:
     args = parse_args()
     ensure_deps()
-
     out: Path = args.out
     out.mkdir(parents=True, exist_ok=True)
+
+    anim_hours = []
+    for part in str(args.anim_hours or "").split(","):
+        part = part.strip()
+        if not part:
+            continue
+        try:
+            anim_hours.append(int(part))
+        except ValueError:
+            pass
+    if args.fxx not in anim_hours:
+        anim_hours.insert(0, args.fxx)
+    anim_hours = sorted(set(anim_hours))
 
     try:
         H = open_hrrr(args.model, args.product, args.fxx)
@@ -272,7 +205,6 @@ def main() -> int:
         print("Check network and: pip install herbie-data cfgrib xarray", file=sys.stderr)
         return 1
 
-    # Valid time ≈ run + fxx hours
     run_date = H.date
     if hasattr(run_date, "to_pydatetime"):
         run_date = run_date.to_pydatetime()
@@ -280,75 +212,44 @@ def main() -> int:
         run_date = datetime.now(timezone.utc)
 
     valid = run_date + timedelta(hours=args.fxx)
-
     layers = {}
     note_parts = []
+    frames = []
 
-    # --- Simulated composite / reflectivity ---
     if not args.skip_refl:
-        refl_ok = False
-        for search in (
-            ":REFC:",  # composite reflectivity
-            ":REFD:1000",
-            ":REF",
-        ):
-            try:
-                print(f"Loading refl search {search!r}...")
-                da = load_field(H, search)
-                vals, lat, lon = field_to_latlon_grid(da)
-                path = out / "refl.png"
-                render_conus_png(
-                    vals,
-                    lat,
-                    lon,
-                    path,
-                    vmin=0,
-                    vmax=75,
-                    cmap="gist_ncar",
-                    dpi=args.dpi,
-                    title="HRRR REFC",
-                )
-                layers["refl"] = {
-                    "url": "/hrrr/refl.png",
-                    "opacity": 0.55,
-                    "label": "Simulated reflectivity",
-                }
-                refl_ok = True
-                break
-            except Exception as e:
-                print(f"  refl search failed: {e}")
-        if not refl_ok:
+        path = out / "refl.png"
+        if render_refl(H, path, args.dpi):
+            layers["refl"] = {"url": "/hrrr/refl.png", "opacity": 0.55, "label": "Simulated reflectivity"}
+            frames.append({"fxx": args.fxx, "valid": iso_z(valid), "url": "/hrrr/refl.png"})
+        else:
             note_parts.append("refl unavailable this run")
 
-    # --- CAPE ---
+        for fxx in anim_hours:
+            if fxx == args.fxx:
+                continue
+            try:
+                Hf = open_hrrr(args.model, args.product, fxx, retries_per_date=1)
+                fpath = out / f"refl_f{fxx:02d}.png"
+                if render_refl(Hf, fpath, args.dpi):
+                    fvalid = run_date + timedelta(hours=fxx)
+                    frames.append({
+                        "fxx": fxx,
+                        "valid": iso_z(fvalid if isinstance(run_date, datetime) else datetime.now(timezone.utc)),
+                        "url": f"/hrrr/refl_f{fxx:02d}.png",
+                    })
+            except Exception as e:
+                print(f"  anim fxx={fxx} failed: {e}")
+
     if not args.skip_cape:
         cape_ok = False
-        for search in (
-            ":CAPE:surface",
-            ":CAPE:90-0 mb above ground",
-            ":CAPE:",
-        ):
+        for search in (":CAPE:surface", ":CAPE:90-0 mb above ground", ":CAPE:"):
             try:
                 print(f"Loading CAPE search {search!r}...")
                 da = load_field(H, search)
                 vals, lat, lon = field_to_latlon_grid(da)
                 path = out / "cape.png"
-                render_conus_png(
-                    vals,
-                    lat,
-                    lon,
-                    path,
-                    vmin=0,
-                    vmax=4000,
-                    cmap="turbo",
-                    dpi=args.dpi,
-                    title="HRRR CAPE",
-                )
-                layers["cape"] = {
-                    "url": "/hrrr/cape.png",
-                    "opacity": 0.45,
-                    "label": "Surface/mixed CAPE",
-                }
+                render_conus_png(vals, lat, lon, path, vmin=0, vmax=4000, cmap="turbo", dpi=args.dpi, title="HRRR CAPE")
+                layers["cape"] = {"url": "/hrrr/cape.png", "opacity": 0.45, "label": "Surface/mixed CAPE"}
                 cape_ok = True
                 break
             except Exception as e:
@@ -356,11 +257,12 @@ def main() -> int:
         if not cape_ok:
             note_parts.append("cape unavailable this run")
 
-    # Keep empty layer stubs so the client always has keys
     if "refl" not in layers:
         layers["refl"] = {"url": "", "opacity": 0.55, "label": "Simulated reflectivity"}
     if "cape" not in layers:
         layers["cape"] = {"url": "", "opacity": 0.45, "label": "MLCAPE"}
+
+    frames = sorted(frames, key=lambda f: f["fxx"])
 
     manifest = {
         "updated": iso_z(datetime.now(timezone.utc)),
@@ -370,6 +272,7 @@ def main() -> int:
         "forecastHour": args.fxx,
         "bounds": BOUNDS_LATLON,
         "layers": layers,
+        "frames": frames,
         "note": (
             "; ".join(note_parts)
             if note_parts
