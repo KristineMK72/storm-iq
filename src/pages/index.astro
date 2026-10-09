@@ -2,7 +2,7 @@
 import Layout from "../layouts/Layout.astro";
 import ChaseScore from "../components/ChaseScore";
 import TargetBoard from "../components/TargetBoard";
-import StormMap from "../components/StormMap";
+import ChaseModeMap from "../components/ChaseModeMap";
 import ModelGuidance from "../components/ModelGuidance";
 import HomeBase from "../components/HomeBase";
 import LookingAhead from "../components/LookingAhead";
@@ -93,7 +93,7 @@ import ModelAtPoint from "../components/ModelAtPoint";
     <div class="section-title">
       <div>
         <div class="eyebrow">Surface conditions</div>
-        <h2>Wind &amp; clouds</h2>
+        <h2>Wind & clouds</h2>
       </div>
       <span class="small muted">AUTO 5 MIN</span>
     </div>
@@ -147,7 +147,7 @@ import ModelAtPoint from "../components/ModelAtPoint";
     <div class="section-title">
       <div>
         <div class="eyebrow">Field tools</div>
-        <h2>Install &amp; near-me alerts</h2>
+        <h2>Install & near-me alerts</h2>
       </div>
       <span class="small muted">PWA</span>
     </div>
@@ -172,11 +172,9 @@ import ModelAtPoint from "../components/ModelAtPoint";
           <div class="eyebrow">National view</div>
           <h2>Live operations map</h2>
         </div>
-        <span class="small muted">LIVE NWS + SPC</span>
+        <span class="small muted">CHASE MODE · NWS + SPC</span>
       </div>
-      <div class="map-shell">
-        <StormMap client:only="react" />
-      </div>
+      <ChaseModeMap client:only="react" />
     </div>
     <ModelGuidance client:only="react" />
   </div>
