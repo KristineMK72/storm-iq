@@ -22,7 +22,7 @@ import argparse
 import json
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 # CONUS geographic bounds — must match Storm IQ Leaflet overlay
@@ -82,35 +82,48 @@ def ensure_deps():
         sys.exit(1)
 
 
-def open_hrrr(model: str, product: str, fxx: int, retries: int = 3):
-    """Initialize Herbie with retries for transient empty/JSON responses from data sources."""
+def _candidate_dates():
+    """Yield date strings to try: 'now' first, then recent hourly cycles."""
+    yield "now"
+    utc = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
+    # HRRR cycles every hour; try the last several hours in case the
+    # newest inventory endpoints are empty or rate-limited.
+    for hours_ago in range(1, 7):
+        dt = utc - timedelta(hours=hours_ago)
+        yield dt.strftime("%Y-%m-%d %H:%M")
+
+
+def open_hrrr(model: str, product: str, fxx: int, retries_per_date: int = 2):
+    """Initialize Herbie, trying 'now' then recent cycles with retries."""
     from herbie import Herbie
 
     last_err = None
     # Prefer reliable cloud archives; NOMADS can be flaky near cycle boundaries
     priority = ["aws", "google", "azure", "nomads"]
 
-    for attempt in range(1, retries + 1):
-        try:
-            H = Herbie(
-                "now",
-                model=model,
-                product=product,
-                fxx=fxx,
-                priority=priority,
-            )
-            print(f"Herbie: model={model} product={product} fxx={fxx}")
-            print(
-                f"  date={H.date}  remote={getattr(H, 'grib', None) or getattr(H, 'SOURCES', '')}"
-            )
-            return H
-        except Exception as e:
-            last_err = e
-            print(f"  Herbie init attempt {attempt}/{retries} failed: {e}")
-            if attempt < retries:
-                delay = 15 * attempt
-                print(f"  retrying in {delay}s...")
-                time.sleep(delay)
+    for date in _candidate_dates():
+        for attempt in range(1, retries_per_date + 1):
+            try:
+                H = Herbie(
+                    date,
+                    model=model,
+                    product=product,
+                    fxx=fxx,
+                    priority=priority,
+                )
+                # Confirm a source was actually found
+                if getattr(H, "grib", None) is None and not getattr(H, "SOURCES", None):
+                    raise RuntimeError(f"No GRIB source found for date={date}")
+                print(f"Herbie: model={model} product={product} fxx={fxx} date={date}")
+                print(
+                    f"  date={H.date}  remote={getattr(H, 'grib', None) or getattr(H, 'SOURCES', '')}"
+                )
+                return H
+            except Exception as e:
+                last_err = e
+                print(f"  Herbie({date!r}) attempt {attempt}/{retries_per_date} failed: {e}")
+                if attempt < retries_per_date:
+                    time.sleep(10 * attempt)
 
     raise last_err
 
@@ -255,7 +268,7 @@ def main() -> int:
     try:
         H = open_hrrr(args.model, args.product, args.fxx)
     except Exception as e:
-        print(f"Failed to init Herbie after retries: {e}", file=sys.stderr)
+        print(f"Failed to init Herbie after all fallbacks: {e}", file=sys.stderr)
         print("Check network and: pip install herbie-data cfgrib xarray", file=sys.stderr)
         return 1
 
@@ -264,8 +277,7 @@ def main() -> int:
     if hasattr(run_date, "to_pydatetime"):
         run_date = run_date.to_pydatetime()
     if not isinstance(run_date, datetime):
-        run_date = datetime.utcnow()
-    from datetime import timedelta
+        run_date = datetime.now(timezone.utc)
 
     valid = run_date + timedelta(hours=args.fxx)
 
