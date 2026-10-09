@@ -257,10 +257,32 @@ def main() -> int:
         if not cape_ok:
             note_parts.append("cape unavailable this run")
 
+    # Prefer existing PNGs over blank URLs so a bad cycle does not wipe the map
     if "refl" not in layers:
-        layers["refl"] = {"url": "", "opacity": 0.55, "label": "Simulated reflectivity"}
+        if (out / "refl.png").is_file() and (out / "refl.png").stat().st_size > 1000:
+            layers["refl"] = {"url": "/hrrr/refl.png", "opacity": 0.55, "label": "Simulated reflectivity"}
+            note_parts.append("refl kept from previous good run")
+            if not any(f.get("url") == "/hrrr/refl.png" for f in frames):
+                frames.append({"fxx": args.fxx, "valid": iso_z(valid), "url": "/hrrr/refl.png"})
+        else:
+            layers["refl"] = {"url": "", "opacity": 0.55, "label": "Simulated reflectivity"}
     if "cape" not in layers:
-        layers["cape"] = {"url": "", "opacity": 0.45, "label": "MLCAPE"}
+        if (out / "cape.png").is_file() and (out / "cape.png").stat().st_size > 1000:
+            layers["cape"] = {"url": "/hrrr/cape.png", "opacity": 0.45, "label": "Surface/mixed CAPE"}
+            note_parts.append("cape kept from previous good run")
+        else:
+            layers["cape"] = {"url": "", "opacity": 0.45, "label": "MLCAPE"}
+
+    for fxx in anim_hours:
+        fpath = out / f"refl_f{fxx:02d}.png"
+        if fpath.is_file() and fpath.stat().st_size > 1000:
+            url = f"/hrrr/refl_f{fxx:02d}.png"
+            if not any(f.get("url") == url for f in frames):
+                frames.append({
+                    "fxx": fxx,
+                    "valid": iso_z(run_date + timedelta(hours=fxx)) if isinstance(run_date, datetime) else None,
+                    "url": url,
+                })
 
     frames = sorted(frames, key=lambda f: f["fxx"])
 
