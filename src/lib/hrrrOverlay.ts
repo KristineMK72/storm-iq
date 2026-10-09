@@ -4,6 +4,13 @@ export type HrrrLayerSpec = {
   label?: string;
 };
 
+/** Optional forecast-hour animation frames (reflectivity) */
+export type HrrrFrame = {
+  fxx: number;
+  valid?: string | null;
+  url: string;
+};
+
 export type HrrrManifest = {
   updated?: string;
   valid?: string | null;
@@ -15,6 +22,8 @@ export type HrrrManifest = {
     refl?: HrrrLayerSpec;
     cape?: HrrrLayerSpec;
   };
+  /** Multi-hour refl frames for model animation (optional) */
+  frames?: HrrrFrame[];
   note?: string;
 };
 
@@ -32,6 +41,7 @@ export function defaultHrrrManifest(): HrrrManifest {
       refl: { url: "", opacity: 0.55, label: "Simulated reflectivity" },
       cape: { url: "", opacity: 0.45, label: "MLCAPE" },
     },
+    frames: [],
     note: "HRRR overlay not configured",
   };
 }
@@ -58,6 +68,7 @@ export async function fetchHrrrManifest(): Promise<HrrrManifest> {
       ...data,
       bounds: data.bounds || DEFAULT_BOUNDS,
       layers: { ...defaultHrrrManifest().layers, ...(data.layers || {}) },
+      frames: Array.isArray(data.frames) ? data.frames : [],
     };
   } catch {
     return defaultHrrrManifest();
@@ -80,4 +91,8 @@ export function formatHrrrValid(iso?: string | null): string {
 
 export function layerReady(spec?: HrrrLayerSpec): boolean {
   return !!(spec && spec.url && String(spec.url).trim().length > 4);
+}
+
+export function hrrrFramesReady(m?: HrrrManifest | null): boolean {
+  return !!(m && Array.isArray(m.frames) && m.frames.length > 1);
 }
