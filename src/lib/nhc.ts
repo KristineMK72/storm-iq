@@ -1,19 +1,19 @@
 /**
  * National Hurricane Center — active tropical cyclones
- * Source: https://www.nhc.noaa.gov/CurrentStorms.json
+ * CurrentStorms.json + NOAA tropical MapServer (track / cone / past track)
  */
 
 export type NhcStorm = {
   id: string;
   binNumber?: string;
   name: string;
-  classification: string; // TD | TS | HU | PT | etc.
-  intensity: number; // max sustained wind kt
-  pressure: number | null; // mb
+  classification: string;
+  intensity: number;
+  pressure: number | null;
   lat: number;
   lng: number;
-  movementDir: number | null; // degrees
-  movementSpeed: number | null; // kt
+  movementDir: number | null;
+  movementSpeed: number | null;
   lastUpdate: string | null;
   publicAdvisoryUrl?: string;
   forecastDiscussionUrl?: string;
@@ -26,6 +26,39 @@ export type NhcStorm = {
 export type NhcActiveResponse = {
   activeStorms: NhcStorm[];
   fetchedAt: string;
+};
+
+/** GeoJSON FeatureCollections for one storm wallet */
+export type NhcStormGeometry = {
+  track: GeoJSON.FeatureCollection | null;
+  cone: GeoJSON.FeatureCollection | null;
+  pastTrack: GeoJSON.FeatureCollection | null;
+  points: GeoJSON.FeatureCollection | null;
+};
+
+const MAPSERVER =
+  "https://mapservices.weather.noaa.gov/tropical/rest/services/tropical/NHC_tropical_weather/MapServer";
+
+/** Layer IDs: Forecast Points, Track, Cone, Past Track — by wallet (AT1…CP5) */
+const WALLET_LAYERS: Record<
+  string,
+  { points: number; track: number; cone: number; pastTrack: number }
+> = {
+  AT1: { points: 6, track: 7, cone: 8, pastTrack: 12 },
+  AT2: { points: 32, track: 33, cone: 34, pastTrack: 38 },
+  AT3: { points: 58, track: 59, cone: 60, pastTrack: 64 },
+  AT4: { points: 84, track: 85, cone: 86, pastTrack: 90 },
+  AT5: { points: 110, track: 111, cone: 112, pastTrack: 116 },
+  EP1: { points: 136, track: 137, cone: 138, pastTrack: 142 },
+  EP2: { points: 162, track: 163, cone: 164, pastTrack: 168 },
+  EP3: { points: 188, track: 189, cone: 190, pastTrack: 194 },
+  EP4: { points: 214, track: 215, cone: 216, pastTrack: 220 },
+  EP5: { points: 240, track: 241, cone: 242, pastTrack: 246 },
+  CP1: { points: 266, track: 267, cone: 268, pastTrack: 272 },
+  CP2: { points: 292, track: 293, cone: 294, pastTrack: 298 },
+  CP3: { points: 318, track: 319, cone: 320, pastTrack: 324 },
+  CP4: { points: 344, track: 345, cone: 346, pastTrack: 350 },
+  CP5: { points: 370, track: 371, cone: 372, pastTrack: 376 },
 };
 
 function num(v: unknown): number | null {
@@ -56,16 +89,13 @@ function parseStorm(raw: any): NhcStorm | null {
     })();
   if (lat == null || lng == null) return null;
 
-  const intensity = num(raw.intensity) ?? 0;
-  const pressure = num(raw.pressure);
-
   return {
     id: String(raw.id || ""),
-    binNumber: raw.binNumber ? String(raw.binNumber) : undefined,
+    binNumber: raw.binNumber ? String(raw.binNumber).toUpperCase() : undefined,
     name: String(raw.name || "Unknown"),
     classification: String(raw.classification || "").toUpperCase(),
-    intensity,
-    pressure,
+    intensity: num(raw.intensity) ?? 0,
+    pressure: num(raw.pressure),
     lat,
     lng,
     movementDir: num(raw.movementDir),
@@ -94,16 +124,49 @@ export async function fetchActiveStorms(): Promise<NhcActiveResponse> {
   return { activeStorms: storms, fetchedAt: new Date().toISOString() };
 }
 
-/** Saffir–Simpson–ish color by classification + intensity */
+async function queryLayer(layerId: number): Promise<GeoJSON.FeatureCollection | null> {
+  try {
+    const url =
+      MAPSERVER +
+      "/" +
+      layerId +
+      "/query?where=1%3D1&outFields=*&returnGeometry=true&f=geojson";
+    const res = await fetch(url, { cache: "no-cache" });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data || data.type !== "FeatureCollection") return null;
+    if (!Array.isArray(data.features) || data.features.length === 0) return null;
+    return data as GeoJSON.FeatureCollection;
+  } catch {
+    return null;
+  }
+}
+
+/** Forecast track, cone, past track for a storm wallet (e.g. AT4, EP3) */
+export async function fetchStormGeometry(binNumber?: string): Promise<NhcStormGeometry> {
+  const empty: NhcStormGeometry = { track: null, cone: null, pastTrack: null, points: null };
+  if (!binNumber) return empty;
+  const key = binNumber.toUpperCase();
+  const ids = WALLET_LAYERS[key];
+  if (!ids) return empty;
+  const [track, cone, pastTrack, points] = await Promise.all([
+    queryLayer(ids.track),
+    queryLayer(ids.cone),
+    queryLayer(ids.pastTrack),
+    queryLayer(ids.points),
+  ]);
+  return { track, cone, pastTrack, points };
+}
+
 export function stormColor(s: NhcStorm): string {
   const c = s.classification;
   const k = s.intensity;
   if (c === "HU" || c === "MH") {
-    if (k >= 137) return "#8b00ff"; // Cat 5
-    if (k >= 113) return "#ff2d55"; // Cat 4
-    if (k >= 96) return "#ff5c5c"; // Cat 3
-    if (k >= 83) return "#ff9f43"; // Cat 2
-    return "#ffd166"; // Cat 1
+    if (k >= 137) return "#8b00ff";
+    if (k >= 113) return "#ff2d55";
+    if (k >= 96) return "#ff5c5c";
+    if (k >= 83) return "#ff9f43";
+    return "#ffd166";
   }
   if (c === "TS") return "#52e0d0";
   if (c === "TD" || c === "SS" || c === "SD") return "#8fa6a8";
@@ -127,12 +190,14 @@ export function stormLabel(s: NhcStorm): string {
 
 export function movementText(s: NhcStorm): string {
   if (s.movementDir == null || s.movementSpeed == null) return "movement unknown";
-  const dirs = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
-  const idx = Math.round(((s.movementDir % 360) + 360) % 360 / 22.5) % 16;
+  const dirs = [
+    "N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
+    "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW",
+  ];
+  const idx = Math.round((((s.movementDir % 360) + 360) % 360) / 22.5) % 16;
   return dirs[idx] + " at " + Math.round(s.movementSpeed) + " kt";
 }
 
-/** Leaflet divIcon HTML for a storm marker */
 export function stormMarkerHtml(s: NhcStorm): string {
   const color = stormColor(s);
   const short =
