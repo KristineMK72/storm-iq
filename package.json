@@ -4,9 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "astro dev",
-    "build": "astro build",
-    "preview": "astro preview"
+    "dev": "node scripts/restore-stormmap.mjs && astro dev",
+    "build": "node scripts/restore-stormmap.mjs && astro build",
+    "preview": "astro preview",
+    "restore:map": "node scripts/restore-stormmap.mjs"
   },
   "dependencies": {
     "@astrojs/react": "^4.3.0",
