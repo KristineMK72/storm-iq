@@ -111,11 +111,22 @@ function parseStorm(raw: any): NhcStorm | null {
 }
 
 export async function fetchActiveStorms(): Promise<NhcActiveResponse> {
-  const res = await fetch("https://www.nhc.noaa.gov/CurrentStorms.json", {
-    cache: "no-cache",
-  });
-  if (!res.ok) throw new Error("NHC CurrentStorms HTTP " + res.status);
-  const data = await res.json();
+  // Prefer same-origin proxy (vercel.json rewrite) — NHC does not send CORS headers.
+  const urls = ["/api/nhc/current", "https://www.nhc.noaa.gov/CurrentStorms.json"];
+  let data: any = null;
+  let lastStatus = 0;
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, { cache: "no-cache" });
+      lastStatus = res.status;
+      if (!res.ok) continue;
+      data = await res.json();
+      if (data) break;
+    } catch {
+      /* try next */
+    }
+  }
+  if (!data) throw new Error("NHC CurrentStorms unavailable (HTTP " + lastStatus + ")");
   const storms: NhcStorm[] = [];
   for (const raw of data?.activeStorms || []) {
     const s = parseStorm(raw);
