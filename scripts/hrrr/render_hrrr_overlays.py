@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -81,13 +82,37 @@ def ensure_deps():
         sys.exit(1)
 
 
-def open_hrrr(model: str, product: str, fxx: int):
+def open_hrrr(model: str, product: str, fxx: int, retries: int = 3):
+    """Initialize Herbie with retries for transient empty/JSON responses from data sources."""
     from herbie import Herbie
 
-    H = Herbie("now", model=model, product=product, fxx=fxx)
-    print(f"Herbie: model={model} product={product} fxx={fxx}")
-    print(f"  date={H.date}  remote={getattr(H, 'grib', None) or getattr(H, 'SOURCES', '')}")
-    return H
+    last_err = None
+    # Prefer reliable cloud archives; NOMADS can be flaky near cycle boundaries
+    priority = ["aws", "google", "azure", "nomads"]
+
+    for attempt in range(1, retries + 1):
+        try:
+            H = Herbie(
+                "now",
+                model=model,
+                product=product,
+                fxx=fxx,
+                priority=priority,
+            )
+            print(f"Herbie: model={model} product={product} fxx={fxx}")
+            print(
+                f"  date={H.date}  remote={getattr(H, 'grib', None) or getattr(H, 'SOURCES', '')}"
+            )
+            return H
+        except Exception as e:
+            last_err = e
+            print(f"  Herbie init attempt {attempt}/{retries} failed: {e}")
+            if attempt < retries:
+                delay = 15 * attempt
+                print(f"  retrying in {delay}s...")
+                time.sleep(delay)
+
+    raise last_err
 
 
 def load_field(H, search: str):
@@ -230,7 +255,7 @@ def main() -> int:
     try:
         H = open_hrrr(args.model, args.product, args.fxx)
     except Exception as e:
-        print(f"Failed to init Herbie: {e}", file=sys.stderr)
+        print(f"Failed to init Herbie after retries: {e}", file=sys.stderr)
         print("Check network and: pip install herbie-data cfgrib xarray", file=sys.stderr)
         return 1
 
