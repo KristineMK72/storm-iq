@@ -1,8 +1,8 @@
 {
-  "updated": "2026-10-09T18:23:02Z",
-  "valid": "2026-10-09T19:22:23Z",
+  "updated": "2026-10-10T00:53:31Z",
+  "valid": "2026-10-10T01:53:22Z",
   "model": "HRRR",
-  "run": "20261009_18",
+  "run": "20261010_00",
   "forecastHour": 1,
   "bounds": [
     [
@@ -29,9 +29,9 @@
   "frames": [
     {
       "fxx": 1,
-      "valid": "2026-10-09T19:22:23Z",
+      "valid": "2026-10-10T01:53:22Z",
       "url": "/hrrr/refl.png"
     }
   ],
-  "note": "refl unavailable this run; cape unavailable this run; refl kept from previous good run; cape kept from previous good run"
+  "note": "Model guidance only \u2014 not observations or NWS warnings."
 }
