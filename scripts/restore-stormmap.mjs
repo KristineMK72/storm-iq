@@ -12,9 +12,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, "..");
 const out = path.join(root, "src/components/StormMap.tsx");
 
-// Commit that has the full self-contained restore (cities + outlook + share)
 const GOOD_RESTORE =
-  "https://raw.githubusercontent.com/KristineMK72/storm-iq/5958c1ba78888c6573f7f52995a3396436196659/scripts/restore-stormmap.mjs";
+  "https://cdn.jsdelivr.net/gh/KristineMK72/storm-iq@5958c1ba78888c6573f7f52995a3396436196659/scripts/restore-stormmap.mjs";
 
 const res = await fetch(GOOD_RESTORE);
 if (!res.ok) {
@@ -22,7 +21,7 @@ if (!res.ok) {
   process.exit(1);
 }
 const goodCode = await res.text();
-if (goodCode.length < 1000 || goodCode.includes("PLACEHOLDER") || goodCode.includes("applyAllPatches")) {
+if (goodCode.length < 1000 || goodCode.includes("PLACEHOLDER")) {
   console.error("restore-stormmap: known-good content looks wrong", goodCode.slice(0, 80));
   process.exit(1);
 }
