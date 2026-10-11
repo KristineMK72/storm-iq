@@ -169,8 +169,8 @@ export default function SkewTPanel({ lat, lng, onClose }: Props) {
   return (
     <div
       style={{
-        position: "absolute", left: 12, right: 12, bottom: 72, zIndex: 1200,
-        maxWidth: 380, margin: "0 auto",
+        position: "fixed", left: 12, right: 12, bottom: "max(16px, env(safe-area-inset-bottom))", zIndex: 9999,
+        maxWidth: 400, margin: "0 auto",
         background: "linear-gradient(145deg, rgba(16,29,34,0.98), rgba(8,15,18,0.98))",
         border: "1px solid rgba(217,255,74,0.35)", borderRadius: 14, padding: 12,
         boxShadow: "0 16px 48px rgba(0,0,0,0.55)", color: "#edf8f7",
