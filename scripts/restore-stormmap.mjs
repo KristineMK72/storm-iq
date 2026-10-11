@@ -48,7 +48,14 @@ if (!t.includes("MapLayerLegends")) {
   );
 }
 
-// Forecast point timeline labels (NHC datelbl / maxwind / tau)
+if (!t.includes("mapShare")) {
+  t = t.replace(
+    'from "../lib/nhc";',
+    'from "../lib/nhc";\nimport { parseMapShare, shareMapView, syncMapShareToUrl } from "../lib/mapShare";'
+  );
+}
+
+// Forecast point timeline labels
 t = t.replace(
   `pointToLayer: (_f, latlng) =>
                   L.circleMarker(latlng, {
@@ -97,6 +104,76 @@ t = t.replace(
   "style: { color, weight: 3.5, opacity: 1 }"
 );
 
+// Layer defaults from URL
+t = t.replace(
+  "const [radarOn, setRadarOn] = useState(true);",
+  "const [radarOn, setRadarOn] = useState(() => parseMapShare().radar ?? true);"
+);
+t = t.replace(
+  "const [cloudsOn, setCloudsOn] = useState(false);",
+  "const [cloudsOn, setCloudsOn] = useState(() => parseMapShare().clouds ?? false);"
+);
+t = t.replace(
+  "const [showTropical, setShowTropical] = useState(true);",
+  "const [showTropical, setShowTropical] = useState(() => parseMapShare().tropical ?? true);"
+);
+if (!t.includes("shareNote")) {
+  t = t.replace(
+    "const [selected, setSelected] = useState<",
+    'const [shareNote, setShareNote] = useState("");\n  const [selected, setSelected] = useState<'
+  );
+}
+
+// Map center/zoom from URL
+t = t.replace(
+  `const map = L.map(mapRef.current, {
+      center: [39.5, -98.0],
+      zoom: 4,
+      zoomControl: true,
+      minZoom: 3,
+      maxZoom: 12,
+    });`,
+  `const share0 = parseMapShare();
+    const map = L.map(mapRef.current, {
+      center: [share0.lat ?? 39.5, share0.lng ?? -98.0],
+      zoom: share0.z ?? 4,
+      zoomControl: true,
+      minZoom: 3,
+      maxZoom: 12,
+    });`
+);
+
+if (!t.includes("syncMapShareToUrl")) {
+  t = t.replace(
+    "mapInstance.current = map;",
+    `if (!document.getElementById("stormiq-fcst-tip-css")) {
+      const st = document.createElement("style");
+      st.id = "stormiq-fcst-tip-css";
+      st.textContent =
+        ".stormiq-fcst-tip{background:rgba(5,9,11,0.92)!important;border:1px solid rgba(255,157,67,0.4)!important;" +
+        "color:#ffd166!important;font-size:10px!important;font-weight:700!important;padding:3px 7px!important;" +
+        "border-radius:6px!important;box-shadow:0 2px 8px rgba(0,0,0,0.4)!important;}" +
+        ".stormiq-fcst-tip::before{border-top-color:rgba(5,9,11,0.92)!important;}";
+      document.head.appendChild(st);
+    }
+    const pushShareUrl = () => {
+      const c = map.getCenter();
+      syncMapShareToUrl({
+        lat: c.lat,
+        lng: c.lng,
+        z: map.getZoom(),
+        radar: radarOn,
+        clouds: cloudsOn,
+        tropical: showTropical,
+      });
+    };
+    map.on("moveend", pushShareUrl);
+    map.on("zoomend", pushShareUrl);
+    pushShareUrl();
+    mapInstance.current = map;`
+  );
+}
+
 if (!t.includes("<MapLayerLegends")) {
   t = t.replace(
     `  return (
@@ -139,20 +216,11 @@ if (!t.includes("<MapLayerLegends")) {
   );
 }
 
-if (!t.includes("stormiq-fcst-tip-css")) {
+// SHARE button
+if (!t.includes("shareMapView({")) {
   t = t.replace(
-    "mapInstance.current = map;",
-    `if (!document.getElementById("stormiq-fcst-tip-css")) {
-      const st = document.createElement("style");
-      st.id = "stormiq-fcst-tip-css";
-      st.textContent =
-        ".stormiq-fcst-tip{background:rgba(5,9,11,0.92)!important;border:1px solid rgba(255,157,67,0.4)!important;" +
-        "color:#ffd166!important;font-size:10px!important;font-weight:700!important;padding:3px 7px!important;" +
-        "border-radius:6px!important;box-shadow:0 2px 8px rgba(0,0,0,0.4)!important;}" +
-        ".stormiq-fcst-tip::before{border-top-color:rgba(5,9,11,0.92)!important;}";
-      document.head.appendChild(st);
-    }
-    mapInstance.current = map;`
+    "style={btnStyle(false)}\n          >\n            ↻\n          </button>",
+    "style={btnStyle(false)}\n          >\n            ↻\n          </button>\n            <button\n              type=\"button\"\n              onClick={async () => {\n                const map = mapInstance.current;\n                if (!map) return;\n                const c = map.getCenter();\n                const result = await shareMapView({\n                  lat: c.lat,\n                  lng: c.lng,\n                  z: map.getZoom(),\n                  radar: radarOn,\n                  clouds: cloudsOn,\n                  tropical: showTropical,\n                });\n                setShareNote(result === \"shared\" ? \"Shared\" : result === \"copied\" ? \"Link copied\" : \"Could not share\");\n                window.setTimeout(() => setShareNote(\"\"), 2500);\n              }}\n              style={btnStyle(!!shareNote)}\n              title=\"Share this map view\"\n            >\n              {shareNote || \"SHARE\"}\n            </button>"
   );
 }
 
