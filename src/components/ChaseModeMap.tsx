@@ -6,8 +6,10 @@ import { parseMapShare, shareMapView, buildMapShareUrl } from "../lib/mapShare";
 const KEY = "stormiq-chase-mode";
 const NIGHT_KEY = "stormiq-chase-night";
 
-export default function ChaseModeMap() {
-  const [chase, setChase] = useState(false);
+type Props = { immersive?: boolean };
+
+export default function ChaseModeMap({ immersive = false }: Props) {
+  const [chase, setChase] = useState(immersive);
   const [night, setNight] = useState(false);
   const [homeSet, setHomeSet] = useState(false);
   const [wakeStatus, setWakeStatus] = useState("");
@@ -16,7 +18,9 @@ export default function ChaseModeMap() {
 
   useEffect(() => {
     try {
-      setChase(localStorage.getItem(KEY) === "1");
+      if (!immersive) {
+        setChase(localStorage.getItem(KEY) === "1");
+      }
       setNight(localStorage.getItem(NIGHT_KEY) === "1");
     } catch {
       // ignore
@@ -25,12 +29,11 @@ export default function ChaseModeMap() {
     const onHome = () => setHomeSet(!!loadHomeBase());
     window.addEventListener("stormiq-home-updated", onHome);
     return () => window.removeEventListener("stormiq-home-updated", onHome);
-  }, []);
+  }, [immersive]);
 
-  // Full-screen + night classes
   useEffect(() => {
     const root = document.documentElement;
-    if (chase) {
+    if (chase && !immersive) {
       root.classList.add("chase-fullscreen");
       document.body.classList.add("chase-fullscreen");
     } else {
@@ -50,9 +53,8 @@ export default function ChaseModeMap() {
       root.classList.remove("chase-night");
       document.body.classList.remove("chase-night");
     };
-  }, [chase, night]);
+  }, [chase, night, immersive]);
 
-  // Screen Wake Lock while Chase Mode is on
   useEffect(() => {
     let released = false;
 
@@ -145,28 +147,39 @@ export default function ChaseModeMap() {
     }
   }
 
+  const shellOn = chase || immersive;
   return (
     <div
       className={
-        chase
+        shellOn
           ? night
-            ? "chase-shell chase-on chase-night-shell"
-            : "chase-shell chase-on"
+            ? "chase-shell chase-on chase-night-shell" + (immersive ? " chase-shell-immersive" : "")
+            : "chase-shell chase-on" + (immersive ? " chase-shell-immersive" : "")
           : "chase-shell"
       }
     >
       <div className="chase-toolbar">
         <div>
-          <div className="eyebrow">{chase ? "Field mode" : "Operations"}</div>
+          <div className="eyebrow">{immersive ? "Full map" : chase ? "Field mode" : "Operations"}</div>
           <strong style={{ fontSize: 16 }}>
-            {chase ? (night ? "CHASE MODE · NIGHT" : "CHASE MODE ON") : "Standard map"}
+            {immersive
+              ? night
+                ? "MAP · NIGHT"
+                : "MAP · LIVE"
+              : chase
+                ? night
+                  ? "CHASE MODE · NIGHT"
+                  : "CHASE MODE ON"
+                : "Standard map"}
           </strong>
           <div className="small muted" style={{ marginTop: 2 }}>
-            {chase
-              ? homeSet
-                ? "Full-screen · near-me · wake lock"
-                : "Full-screen + wake lock — set Home base for near-me zoom"
-              : "Flip on for full-screen field map + screen stay-on"}
+            {immersive
+              ? "Radar · layers · tap sounding · share"
+              : chase
+                ? homeSet
+                  ? "Full-screen · near-me · wake lock"
+                  : "Full-screen + wake lock — set Home base for near-me zoom"
+                : "Flip on for full-screen field map + screen stay-on"}
           </div>
           {chase && wakeStatus && (
             <div className="small" style={{ marginTop: 4, color: "var(--lime)" }}>
@@ -176,7 +189,7 @@ export default function ChaseModeMap() {
         </div>
 
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-          {chase && (
+          {(chase || immersive) && (
             <button
               type="button"
               onClick={toggleNight}
@@ -193,17 +206,19 @@ export default function ChaseModeMap() {
           >
             {shareNote || "🔗 SHARE MAP"}
           </button>
-          <button
-            type="button"
-            onClick={toggle}
-            className={chase ? "chase-btn chase-btn-on" : "chase-btn"}
-          >
-            {chase ? "EXIT CHASE MODE" : "ENTER CHASE MODE"}
-          </button>
+          {!immersive && (
+            <button
+              type="button"
+              onClick={toggle}
+              className={chase ? "chase-btn chase-btn-on" : "chase-btn"}
+            >
+              {chase ? "EXIT CHASE MODE" : "ENTER CHASE MODE"}
+            </button>
+          )}
         </div>
       </div>
 
-      {chase && (
+      {chase && !immersive && (
         <div className="chase-banner">
           <span>{night ? "NIGHT CHASE" : "CHASE MODE · FULL SCREEN"}</span>
           <span className="small muted">
@@ -212,8 +227,8 @@ export default function ChaseModeMap() {
         </div>
       )}
 
-      <div className={chase ? "map-shell map-shell-chase" : "map-shell"}>
-        <StormMap chaseMode={chase} />
+      <div className={shellOn ? "map-shell map-shell-chase" + (immersive ? " map-shell-immersive" : "") : "map-shell"}>
+        <StormMap chaseMode={chase || immersive} />
       </div>
     </div>
   );
