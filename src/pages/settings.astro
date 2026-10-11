@@ -1,0 +1,81 @@
+---
+import Layout from "../layouts/Layout.astro";
+import HomeBase from "../components/HomeBase";
+import FieldAlerts from "../components/FieldAlerts";
+import ChaseWatch from "../components/ChaseWatch";
+import ChaseRegions from "../components/ChaseRegions";
+import LowSignalMode from "../components/LowSignalMode";
+import VoiceReadouts from "../components/VoiceReadouts";
+import OfflineSnapPanel from "../components/OfflineSnap";
+import DataExport from "../components/DataExport";
+import CarFieldGuide from "../components/CarFieldGuide";
+import ChaseLogPanel from "../components/ChaseLog";
+---
+
+<Layout title="Storm IQ | Settings">
+
+  <div class="page-head">
+    <div class="eyebrow">Preferences · field tools</div>
+    <h1>SETTINGS</h1>
+    <p>
+      Home base, alert sounds, install, offline tools, and chase preferences.
+      These used to sit above the map — they live here so Command and Map stay focused.
+    </p>
+  </div>
+
+  <div class="card" style="margin-bottom:18px">
+    <div class="section-title">
+      <div>
+        <div class="eyebrow">Location</div>
+        <h2>Home base</h2>
+      </div>
+      <span class="small muted">NEAR-ME</span>
+    </div>
+    <HomeBase client:only="react" />
+  </div>
+
+  <div class="card" style="margin-bottom:18px">
+    <div class="section-title">
+      <div>
+        <div class="eyebrow">Your zones</div>
+        <h2>Saved chase regions</h2>
+      </div>
+      <span class="small muted">PIN AREAS</span>
+    </div>
+    <ChaseRegions client:only="react" />
+  </div>
+
+  <div class="card" style="margin-bottom:18px;border-color:rgba(217,255,74,0.3)">
+    <div class="section-title">
+      <div>
+        <div class="eyebrow">Audio</div>
+        <h2>Chase alert sounds</h2>
+      </div>
+      <span class="small muted">SOUNDS</span>
+    </div>
+    <ChaseWatch client:only="react" />
+  </div>
+
+  <div class="card" style="margin-bottom:18px;border-color:rgba(217,255,74,0.25)">
+    <div class="section-title">
+      <div>
+        <div class="eyebrow">Install & alerts</div>
+        <h2>App install · near-me alerts</h2>
+      </div>
+      <span class="small muted">PWA</span>
+    </div>
+    <FieldAlerts client:only="react" />
+  </div>
+
+  <LowSignalMode client:only="react" />
+  <VoiceReadouts client:only="react" />
+
+  <div class="grid two" style="margin-top:18px;margin-bottom:18px">
+    <ChaseLogPanel client:only="react" />
+    <OfflineSnapPanel client:only="react" />
+  </div>
+
+  <DataExport client:only="react" />
+  <CarFieldGuide />
+
+</Layout>

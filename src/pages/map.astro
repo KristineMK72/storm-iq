@@ -1,83 +1,37 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import ChaseModeMap from "../components/ChaseModeMap";
-import OutlookDiscussion from "../components/OutlookDiscussion";
-import FutureOutlookMap from "../components/FutureOutlookMap";
 ---
 
 <Layout title="Storm IQ | Map">
 
   <div class="page-head">
-
-    <div class="eyebrow">
-      National operations map
-    </div>
-
-    <h1>
-      STORM MAP
-    </h1>
-
+    <div class="eyebrow">National operations map</div>
+    <h1>STORM MAP</h1>
     <p>
-      Live National Weather Service alerts, radar, and SPC Day 1 risk areas.
-      Use <strong style="color:var(--lime)">Chase Mode</strong> for a taller,
-      field-ready map with near-me focus when home base is set.
+      Live NWS alerts, radar, SPC Day 1 risk, and tropical tracks.
+      Use <strong style="color:var(--lime)">Chase Mode</strong> for a taller field map.
+      Forecast outlooks moved to <a href="/forecast" style="color:var(--lime)">Forecast</a>.
     </p>
-
   </div>
 
-
   <div class="card">
-
     <div class="section-title">
       <div>
         <div class="eyebrow">Now</div>
         <h2>Live operations</h2>
       </div>
-      <span class="small muted">DAY 1 + ALERTS</span>
+      <span class="small muted">DAY 1 + ALERTS + TROPICAL</span>
     </div>
-
     <ChaseModeMap client:only="react" />
-
   </div>
 
-
-  <div class="card" style="margin-top:18px">
-
-    <div class="section-title">
-      <div>
-        <div class="eyebrow">Looking ahead</div>
-        <h2>Future target areas</h2>
-      </div>
-      <span class="small muted">DAY 2 / DAY 3</span>
-    </div>
-
-    <p class="muted" style="font-size:13px;line-height:1.55;margin:0 0 14px">
-      Potential severe weather footprints for tomorrow and the day after.
-      Use these to plan travel windows — they are outlooks only, not warnings.
-    </p>
-
-    <FutureOutlookMap client:only="react" />
-
-  </div>
-
-
-  <OutlookDiscussion client:only="react" />
-
-
-  <div
-    class="notice"
-    style="margin-top:18px"
-  >
-
-    <strong>
-      LIVE DATA:
-    </strong>
-
-    Chase Mode = tall map + near-me zoom from your home base.
-    Top map = radar, Day 1 outlook, alert polygons.
-    Bottom map = Day 2 / Day 3 future targets.
+  <div class="notice" style="margin-top:18px">
+    <strong>LIVE DATA:</strong>
+    Radar, Day 1 outlook, alert polygons, NHC tracks.
+    Day 2 / Day 3 targets and model tables →
+    <a href="/forecast" style="color:var(--lime)">Forecast</a>.
     Official NWS warnings always take priority.
-
   </div>
 
 </Layout>

@@ -1,0 +1,75 @@
+---
+import Layout from "../layouts/Layout.astro";
+import ModelAtPoint from "../components/ModelAtPoint";
+import ModelGuidance from "../components/ModelGuidance";
+import LookingAhead from "../components/LookingAhead";
+import UpcomingPotential from "../components/UpcomingPotential";
+import FutureOutlookMap from "../components/FutureOutlookMap";
+import OutlookDiscussion from "../components/OutlookDiscussion";
+import QuietDay from "../components/QuietDay";
+import ChaseTiming from "../components/ChaseTiming";
+import GoNoGo from "../components/GoNoGo";
+import WxConditions from "../components/WxConditions";
+---
+
+<Layout title="Storm IQ | Forecast">
+
+  <div class="page-head">
+    <div class="eyebrow">Models · outlooks · timing</div>
+    <h1>FORECAST</h1>
+    <p>
+      Point forecast near home base, model guidance, SPC outlook discussion,
+      and Day 2 / Day 3 target areas — pulled off Command so the ops map stays clear.
+    </p>
+  </div>
+
+  <QuietDay client:only="react" />
+
+  <div id="chase-timing" class="card" style="margin-bottom:18px">
+    <div class="section-title">
+      <div>
+        <div class="eyebrow">Chase day clock</div>
+        <h2>Timing windows</h2>
+      </div>
+      <span class="small muted">WHEN TO GO</span>
+    </div>
+    <ChaseTiming client:only="react" />
+  </div>
+
+  <GoNoGo client:only="react" />
+
+  <div class="card" style="margin-bottom:18px">
+    <div class="section-title">
+      <div>
+        <div class="eyebrow">Surface</div>
+        <h2>Conditions at home base</h2>
+      </div>
+      <span class="small muted">NOW</span>
+    </div>
+    <WxConditions client:only="react" />
+  </div>
+
+  <ModelAtPoint client:only="react" />
+  <ModelGuidance client:only="react" />
+
+  <UpcomingPotential client:only="react" />
+
+  <div class="card" style="margin-top:18px" id="future-targets">
+    <div class="section-title">
+      <div>
+        <div class="eyebrow">Looking ahead</div>
+        <h2>Future target areas</h2>
+      </div>
+      <span class="small muted">DAY 2 / DAY 3</span>
+    </div>
+    <p class="muted" style="font-size:13px;line-height:1.55;margin:0 0 14px">
+      Potential severe weather footprints for tomorrow and the day after.
+      Outlooks only — not warnings.
+    </p>
+    <FutureOutlookMap client:only="react" />
+  </div>
+
+  <LookingAhead client:only="react" />
+  <OutlookDiscussion client:only="react" />
+
+</Layout>
