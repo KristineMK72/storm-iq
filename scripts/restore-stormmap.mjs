@@ -1,34 +1,94 @@
 #!/usr/bin/env node
+/**
+ * Downloads the last known-good restore script (cities, outlook, share, etc.)
+ * runs it, then applies the tap-map sounding patch.
+ */
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { spawnSync } from "node:child_process";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const out = path.join(__dirname, "..", "src/components/StormMap.tsx");
-const SOURCE =
-  "https://raw.githubusercontent.com/KristineMK72/storm-iq/e6f7b0c2/src/components/StormMap.tsx";
+const root = path.join(__dirname, "..");
+const out = path.join(root, "src/components/StormMap.tsx");
 
-const res = await fetch(SOURCE);
+const GOOD_RESTORE =
+  "https://raw.githubusercontent.com/KristineMK72/storm-iq/e3841d6a52c2642e62ac0b41b4ec124c48905782/scripts/restore-stormmap.mjs";
+
+const res = await fetch(GOOD_RESTORE);
 if (!res.ok) {
-  console.error("restore-stormmap: fetch failed", res.status);
+  console.error("restore-stormmap: could not fetch known-good restore", res.status);
   process.exit(1);
 }
-let t = await res.text();
+const goodCode = await res.text();
+const tmp = path.join(__dirname, ".restore-good.generated.mjs");
+fs.writeFileSync(tmp, goodCode);
+const run = spawnSync(process.execPath, [tmp], { cwd: root, encoding: "utf8" });
+if (run.status !== 0) {
+  console.error(run.stdout || "");
+  console.error(run.stderr || "");
+  process.exit(run.status || 1);
+}
+console.log(run.stdout || "");
 
-const chunks = [];
-for (let i = 0; i < 8; i++) {
-  const p = path.join(__dirname, `patch_b64_${i}.txt`);
-  if (!fs.existsSync(p)) break;
-  chunks.push(fs.readFileSync(p, "utf8").trim());
+// --- Tap-map sounding patch on the generated StormMap.tsx ---
+let t = fs.readFileSync(out, "utf8");
+
+if (!t.includes("SkewTPanel")) {
+  t = t.replace(
+    'from "../lib/nhc";',
+    'from "../lib/nhc";\nimport SkewTPanel from "./SkewTPanel";'
+  );
 }
-if (!chunks.length) {
-  console.error("restore-stormmap: missing patch_b64_*.txt");
-  process.exit(1);
+if (!t.includes("soundingPt")) {
+  if (t.includes('const [shareNote, setShareNote] = useState("");')) {
+    t = t.replace(
+      'const [shareNote, setShareNote] = useState("");',
+      'const [shareNote, setShareNote] = useState("");\n  const [soundingPt, setSoundingPt] = useState<{ lat: number; lng: number } | null>(null);'
+    );
+  } else {
+    t = t.replace(
+      "const [selected, setSelected] = useState<",
+      'const [soundingPt, setSoundingPt] = useState<{ lat: number; lng: number } | null>(null);\n  const [selected, setSelected] = useState<'
+    );
+  }
 }
-const code = Buffer.from(chunks.join(""), "base64").toString("utf8");
-const tmp = path.join(__dirname, ".stormmap-patches.generated.mjs");
-fs.writeFileSync(tmp, code);
-const mod = await import(pathToFileURL(tmp).href);
-t = mod.applyAllPatches(t);
+if (!t.includes("setSoundingPt({")) {
+  t = t.replace(
+    "mapInstance.current = map;",
+    `map.on("click", (e: L.LeafletMouseEvent) => {
+      setSoundingPt({ lat: e.latlng.lat, lng: e.latlng.lng });
+    });
+    mapInstance.current = map;`
+  );
+}
+if (!t.includes("<SkewTPanel")) {
+  t = t.replace(
+    `            CLEAR
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}`,
+    `            CLEAR
+            </button>
+          </div>
+        </div>
+      )}
+      {soundingPt && (
+        <SkewTPanel
+          lat={soundingPt.lat}
+          lng={soundingPt.lng}
+          onClose={() => setSoundingPt(null)}
+        />
+      )}
+    </div>
+  );
+}`
+  );
+}
+
 fs.writeFileSync(out, t);
-console.log("restore-stormmap: wrote", out, "(" + t.length + " bytes)");
+console.log("restore-stormmap: sounding wired, wrote", out, "(" + t.length + " bytes)");
