@@ -1,0 +1,110 @@
+/* Keep menu available in Chase Mode fullscreen */
+html.chase-fullscreen footer,
+html.chase-fullscreen .page-head,
+body.chase-fullscreen footer {
+  display: none !important;
+}
+html.chase-fullscreen .topbar,
+body.chase-fullscreen .topbar {
+  display: flex !important;
+  height: 52px;
+  z-index: 2000;
+}
+html.chase-fullscreen .desktop-nav,
+body.chase-fullscreen .desktop-nav {
+  display: none !important;
+}
+html.chase-fullscreen .menu-btn,
+body.chase-fullscreen .menu-btn {
+  display: flex !important;
+}
+html.chase-fullscreen .mobile-nav:not([hidden]),
+body.chase-fullscreen .mobile-nav:not([hidden]) {
+  display: flex !important;
+  z-index: 1999;
+  top: 52px;
+}
+/* Override older rule that hid the whole topbar */
+html.chase-fullscreen .topbar,
+body.chase-fullscreen .topbar {
+  display: flex !important;
+}
+
+/* NHC forecast point cyclone cards */
+.stormiq-hcard-wrap {
+  background: transparent !important;
+  border: none !important;
+}
+.stormiq-hcard {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 128px;
+  max-width: 168px;
+  padding: 6px 8px 6px 6px;
+  border-radius: 12px;
+  background: linear-gradient(145deg, rgba(8,14,18,0.96), rgba(12,22,28,0.94));
+  border: 1px solid rgba(255, 159, 67, 0.45);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.55), 0 0 0 1px rgba(82,224,208,0.08);
+  color: #edf8f7;
+  font-family: Inter, system-ui, sans-serif;
+  pointer-events: auto;
+}
+.stormiq-hcard-ico {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  background: radial-gradient(circle at 35% 30%, #52e0d0 0%, #0b3d4a 55%, #05090b 100%);
+  border: 1px solid rgba(82, 224, 208, 0.5);
+  flex-shrink: 0;
+  align-self: center;
+}
+.stormiq-hcard-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  line-height: 1.2;
+}
+.stormiq-hcard-body strong {
+  font-size: 11px;
+  font-weight: 800;
+  color: #ffd166;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stormiq-hcard-body span {
+  font-size: 10px;
+  font-weight: 700;
+  color: #52e0d0;
+}
+.stormiq-hcard-body em {
+  font-size: 9px;
+  font-style: normal;
+  color: #8fa6a8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stormiq-hcard-now {
+  border-color: rgba(217, 255, 74, 0.65);
+  box-shadow: 0 0 14px rgba(217, 255, 74, 0.25);
+}
+.stormiq-hcard-now .stormiq-hcard-ico {
+  background: radial-gradient(circle at 35% 30%, #d9ff4a 0%, #3d4a0b 55%, #05090b 100%);
+  border-color: rgba(217, 255, 74, 0.6);
+}
+.leaflet-tooltip.stormiq-fcst-tip {
+  background: rgba(5,9,11,0.94) !important;
+  border: 1px solid rgba(255,159,67,0.45) !important;
+  color: #ffd166 !important;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.5) !important;
+}
+.leaflet-tooltip.stormiq-fcst-tip::before {
+  border-top-color: rgba(5,9,11,0.94) !important;
+}
