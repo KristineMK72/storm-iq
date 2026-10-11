@@ -7,6 +7,7 @@ const {
   description = "Live storm intelligence for safer storm observation — NWS alerts, SPC outlooks, radar, and chase targeting across the United States.",
   ogImage: ogImageProp,
   ogUrl: ogUrlProp,
+  immersive = false,
 } = Astro.props;
 
 const site = "https://storm-iq.vercel.app";
@@ -55,8 +56,8 @@ function isActive(href: string) {
     <title>{title}</title>
   </head>
 
-  <body>
-    <div class="app-shell">
+  <body class={immersive ? "map-immersive" : undefined}>
+    <div class:list={["app-shell", immersive && "app-shell-map"]}>
 
       <header class="topbar">
 
@@ -107,36 +108,23 @@ function isActive(href: string) {
       </main>
 
       <footer>
-        <span>STORM IQ</span>
-        <span>Official weather guidance always takes priority.</span>
+        <span>Storm IQ · field weather intelligence</span>
+        <span class="muted">Not a substitute for NWS warnings</span>
       </footer>
 
     </div>
 
-    <script is:inline>
-      (function () {
-        var btn = document.getElementById("menu-btn");
-        var panel = document.getElementById("mobile-nav");
-        if (!btn || !panel) return;
-        btn.addEventListener("click", function () {
-          var open = panel.hasAttribute("hidden");
-          if (open) {
-            panel.removeAttribute("hidden");
-            btn.setAttribute("aria-expanded", "true");
-            btn.classList.add("open");
-          } else {
-            panel.setAttribute("hidden", "");
-            btn.setAttribute("aria-expanded", "false");
-            btn.classList.remove("open");
-          }
+    <script>
+      const btn = document.getElementById("menu-btn");
+      const nav = document.getElementById("mobile-nav");
+      if (btn && nav) {
+        btn.addEventListener("click", () => {
+          const open = nav.hasAttribute("hidden");
+          if (open) nav.removeAttribute("hidden");
+          else nav.setAttribute("hidden", "");
+          btn.setAttribute("aria-expanded", open ? "true" : "false");
         });
-
-        if ("serviceWorker" in navigator) {
-          window.addEventListener("load", function () {
-            navigator.serviceWorker.register("/sw.js").catch(function () {});
-          });
-        }
-      })();
+      }
     </script>
   </body>
 </html>
