@@ -5,15 +5,16 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, "..");
 const out = path.join(root, "src/components/StormMap.tsx");
 
+// Commit that has the full self-contained restore (cities + outlook + share)
 const GOOD_RESTORE =
-  "https://raw.githubusercontent.com/KristineMK72/storm-iq/e3841d6a52c2642e62ac0b41b4ec124c48905782/scripts/restore-stormmap.mjs";
+  "https://raw.githubusercontent.com/KristineMK72/storm-iq/5958c1ba78888c6573f7f52995a3396436196659/scripts/restore-stormmap.mjs";
 
 const res = await fetch(GOOD_RESTORE);
 if (!res.ok) {
@@ -21,6 +22,10 @@ if (!res.ok) {
   process.exit(1);
 }
 const goodCode = await res.text();
+if (goodCode.length < 1000 || goodCode.includes("PLACEHOLDER") || goodCode.includes("applyAllPatches")) {
+  console.error("restore-stormmap: known-good content looks wrong", goodCode.slice(0, 80));
+  process.exit(1);
+}
 const tmp = path.join(__dirname, ".restore-good.generated.mjs");
 fs.writeFileSync(tmp, goodCode);
 const run = spawnSync(process.execPath, [tmp], { cwd: root, encoding: "utf8" });
@@ -31,7 +36,6 @@ if (run.status !== 0) {
 }
 console.log(run.stdout || "");
 
-// --- Tap-map sounding patch on the generated StormMap.tsx ---
 let t = fs.readFileSync(out, "utf8");
 
 if (!t.includes("SkewTPanel")) {
