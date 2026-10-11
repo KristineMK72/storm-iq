@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import StormMap from "./StormMap";
 import { loadHomeBase } from "../lib/homeBase";
+import { parseMapShare, shareMapView, buildMapShareUrl } from "../lib/mapShare";
 
 const KEY = "stormiq-chase-mode";
 const NIGHT_KEY = "stormiq-chase-night";
@@ -10,6 +11,7 @@ export default function ChaseModeMap() {
   const [night, setNight] = useState(false);
   const [homeSet, setHomeSet] = useState(false);
   const [wakeStatus, setWakeStatus] = useState("");
+  const [shareNote, setShareNote] = useState("");
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
 
   useEffect(() => {
@@ -124,6 +126,25 @@ export default function ChaseModeMap() {
     });
   }
 
+  async function shareView() {
+    try {
+      const p = parseMapShare();
+      const result = await shareMapView({
+        lat: p.lat ?? 39.5,
+        lng: p.lng ?? -98.0,
+        z: p.z ?? 4,
+        radar: p.radar ?? true,
+        clouds: p.clouds ?? false,
+        tropical: p.tropical ?? true,
+      });
+      setShareNote(result === "shared" ? "Shared!" : result === "copied" ? "Link copied!" : "Could not share");
+      window.setTimeout(() => setShareNote(""), 2500);
+    } catch {
+      setShareNote("Could not share");
+      window.setTimeout(() => setShareNote(""), 2500);
+    }
+  }
+
   return (
     <div
       className={
@@ -164,6 +185,14 @@ export default function ChaseModeMap() {
               {night ? "NIGHT ON" : "NIGHT CONTRAST"}
             </button>
           )}
+          <button
+            type="button"
+            onClick={shareView}
+            className={shareNote ? "chase-btn chase-btn-on" : "chase-btn"}
+            title="Share this map view"
+          >
+            {shareNote || "🔗 SHARE MAP"}
+          </button>
           <button
             type="button"
             onClick={toggle}
