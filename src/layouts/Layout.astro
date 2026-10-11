@@ -65,8 +65,10 @@ function isActive(href: string) {
         <nav class="desktop-nav">
           <a href="/" class={isActive("/") ? "nav-active" : ""}>Command</a>
           <a href="/map" class={isActive("/map") ? "nav-active" : ""}>Map</a>
+          <a href="/forecast" class={isActive("/forecast") ? "nav-active" : ""}>Forecast</a>
           <a href="/targets" class={isActive("/targets") ? "nav-active" : ""}>Targets</a>
           <a href="/alerts" class={isActive("/alerts") ? "nav-active" : ""}>Alerts</a>
+          <a href="/settings" class={isActive("/settings") ? "nav-active" : ""}>Settings</a>
         </nav>
 
         <div class="live-pill">
@@ -89,8 +91,10 @@ function isActive(href: string) {
       <div class="mobile-nav" id="mobile-nav" hidden>
         <a href="/" class={isActive("/") ? "nav-active" : ""}>Command</a>
         <a href="/map" class={isActive("/map") ? "nav-active" : ""}>Map</a>
+        <a href="/forecast" class={isActive("/forecast") ? "nav-active" : ""}>Forecast</a>
         <a href="/targets" class={isActive("/targets") ? "nav-active" : ""}>Targets</a>
         <a href="/alerts" class={isActive("/alerts") ? "nav-active" : ""}>Alerts</a>
+        <a href="/settings" class={isActive("/settings") ? "nav-active" : ""}>Settings</a>
       </div>
 
       <main>
