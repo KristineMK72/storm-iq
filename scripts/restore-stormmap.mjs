@@ -55,7 +55,7 @@ if (!t.includes("mapShare")) {
   );
 }
 
-// Forecast point timeline labels
+// Forecast point timeline — cyclone cards (not plain white tips)
 t = t.replace(
   `pointToLayer: (_f, latlng) =>
                   L.circleMarker(latlng, {
@@ -65,31 +65,34 @@ t = t.replace(
                   const p = (feature as any)?.properties || {};
                   const tau = p.tau != null ? Number(p.tau) : null;
                   const isNow = tau === 0;
-                  const m = L.circleMarker(latlng, {
-                    radius: isNow ? 7 : 5,
-                    color: "#edf8f7",
-                    fillColor: color,
-                    fillOpacity: 0.95,
-                    weight: isNow ? 2 : 1.5,
-                  });
                   const when = p.datelbl || p.fldatelbl || (tau != null ? "F+" + tau + "h" : "forecast");
                   const wind = p.maxwind != null && Number(p.maxwind) < 9000 ? Number(p.maxwind) + " kt" : "";
                   const stage = p.tcdvlp || p.stormtype || "";
-                  const tip =
-                    "<strong style=\\"color:#edf8f7\\">" + when + "</strong>" +
-                    (wind ? " · " + wind : "") +
-                    (stage ? "<br/><span style=\\"color:#8fa6a8\\">" + stage + "</span>" : "") +
-                    (tau != null ? "<br/><span style=\\"color:#6b8082\\">+" + tau + "h</span>" : "");
-                  m.bindTooltip(tip, {
-                    permanent: !isNow,
-                    direction: "top",
-                    offset: [0, -8],
-                    className: "stormiq-fcst-tip",
-                    opacity: 0.95,
+                  const title = (p.stormname || stormLabel(s) || "Cyclone").toString();
+                  const cardHtml =
+                    '<div class="stormiq-hcard' + (isNow ? ' stormiq-hcard-now' : '') + '">' +
+                    '<div class="stormiq-hcard-ico">🌀</div>' +
+                    '<div class="stormiq-hcard-body">' +
+                    '<strong>' + when + (wind ? ' · ' + wind : '') + '</strong>' +
+                    (stage ? '<span>' + stage + '</span>' : '') +
+                    (tau != null ? '<em>+' + tau + 'h · ' + title + '</em>' : '<em>' + title + '</em>') +
+                    '</div></div>';
+                  const icon = L.divIcon({
+                    className: 'stormiq-hcard-wrap',
+                    html: cardHtml,
+                    iconSize: [158, 52],
+                    iconAnchor: [20, 26],
                   });
+                  const m = L.marker(latlng, { icon, zIndexOffset: isNow ? 600 : 400 });
                   m.bindPopup(
-                    "<strong>" + (p.stormname || stormLabel(s)) + "</strong><br/>" + tip +
-                    (p.advdate ? "<br/><span style=\\"color:#6b8082\\">Adv " + (p.advisnum || "") + " · " + p.advdate + "</span>" : "")
+                    '<div style="min-width:160px">' +
+                    '<div style="font-size:18px;margin-bottom:4px">🌀</div>' +
+                    '<strong style="color:#edf8f7">' + title + '</strong><br/>' +
+                    '<span style="color:#ffd166">' + when + (wind ? ' · ' + wind : '') + '</span>' +
+                    (stage ? '<br/><span style="color:#8fa6a8">' + stage + '</span>' : '') +
+                    (tau != null ? '<br/><span style="color:#6b8082">+' + tau + 'h from advisory</span>' : '') +
+                    (p.advdate ? '<br/><span style="color:#6b8082">Adv ' + (p.advisnum || '') + ' · ' + p.advdate + '</span>' : '') +
+                    '</div>'
                   );
                   return m;
                 },`
@@ -220,7 +223,7 @@ if (!t.includes("<MapLayerLegends")) {
 if (!t.includes("shareMapView({")) {
   t = t.replace(
     "style={btnStyle(false)}\n          >\n            ↻\n          </button>",
-    "style={btnStyle(false)}\n          >\n            ↻\n          </button>\n            <button\n              type=\"button\"\n              onClick={async () => {\n                const map = mapInstance.current;\n                if (!map) return;\n                const c = map.getCenter();\n                const result = await shareMapView({\n                  lat: c.lat,\n                  lng: c.lng,\n                  z: map.getZoom(),\n                  radar: radarOn,\n                  clouds: cloudsOn,\n                  tropical: showTropical,\n                });\n                setShareNote(result === \"shared\" ? \"Shared\" : result === \"copied\" ? \"Link copied\" : \"Could not share\");\n                window.setTimeout(() => setShareNote(\"\"), 2500);\n              }}\n              style={btnStyle(!!shareNote)}\n              title=\"Share this map view\"\n            >\n              {shareNote || \"SHARE\"}\n            </button>"
+    "style={btnStyle(false)}\n          >\n            ↻\n          </button>\n            <button\n              type=\"button\"\n              onClick={async () => {\n                const map = mapInstance.current;\n                if (!map) return;\n                const c = map.getCenter();\n                const result = await shareMapView({\n                  lat: c.lat,\n                  lng: c.lng,\n                  z: map.getZoom(),\n                  radar: radarOn,\n                  clouds: cloudsOn,\n                  tropical: showTropical,\n                });\n                setShareNote(result === \"shared\" ? \"Shared\" : result === \"copied\" ? \"Link copied\" : \"Could not share\");\n                window.setTimeout(() => setShareNote(\"\"), 2500);\n              }}\n              style={btnStyle(!!shareNote)}\n              title=\"Share this map view\"\n            >\n              {shareNote || \"🔗 SHARE\"}\n            </button>"
   );
 }
 
