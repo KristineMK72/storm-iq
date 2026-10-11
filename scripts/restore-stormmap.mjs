@@ -56,16 +56,39 @@ if (!t.includes("soundingPt")) {
     );
   }
 }
-if (!t.includes("setSoundingPt({")) {
+
+// Reliable map click: always (re)bind sounding handler; draw a pin
+if (!t.includes("stormiq-sounding-marker")) {
+  // Remove any prior partial click inject so we can replace cleanly
+  t = t.replace(
+    /map\.on\("click", \(e: L\.LeafletMouseEvent\) => \{\s*setSoundingPt\(\{ lat: e\.latlng\.lat, lng: e\.latlng\.lng \}\);\s*\}\);\s*/,
+    ""
+  );
   t = t.replace(
     "mapInstance.current = map;",
     `map.on("click", (e: L.LeafletMouseEvent) => {
-      setSoundingPt({ lat: e.latlng.lat, lng: e.latlng.lng });
+      const lat = e.latlng.lat;
+      const lng = e.latlng.lng;
+      setSoundingPt({ lat, lng });
+      const prev = (map as any)._stormiqSoundingMarker as L.CircleMarker | undefined;
+      if (prev) map.removeLayer(prev);
+      const pin = L.circleMarker([lat, lng], {
+        radius: 8,
+        color: "#d9ff4a",
+        fillColor: "#d9ff4a",
+        fillOpacity: 0.95,
+        weight: 2,
+      }).addTo(map);
+      pin.bindTooltip("Sounding", { permanent: true, direction: "top", offset: [0, -8], className: "stormiq-city-tip stormiq-city-tip-major" });
+      (map as any)._stormiqSoundingMarker = pin;
     });
+    // stormiq-sounding-marker
     mapInstance.current = map;`
   );
 }
+
 if (!t.includes("<SkewTPanel")) {
+  // Prefer inside relative map wrapper (after selected block) so panel is on top of map
   if (t.includes("<MapLayerLegends")) {
     t = t.replace(
       "    <MapLayerLegends />",
@@ -73,7 +96,15 @@ if (!t.includes("<SkewTPanel")) {
         <SkewTPanel
           lat={soundingPt.lat}
           lng={soundingPt.lng}
-          onClose={() => setSoundingPt(null)}
+          onClose={() => {
+            setSoundingPt(null);
+            const map = mapInstance.current;
+            const prev = map && (map as any)._stormiqSoundingMarker;
+            if (map && prev) {
+              map.removeLayer(prev);
+              (map as any)._stormiqSoundingMarker = null;
+            }
+          }}
         />
       )}
     <MapLayerLegends />`
