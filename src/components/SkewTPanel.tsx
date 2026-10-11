@@ -7,6 +7,13 @@ import {
 } from "../lib/sounding";
 import { fetchNearestObserved, type ObservedSounding } from "../lib/raob";
 
+function cToF(c: number): number {
+  return (c * 9) / 5 + 32;
+}
+function mToFt(m: number): number {
+  return m * 3.28084;
+}
+
 type Props = {
   lat: number;
   lng: number;
@@ -56,9 +63,9 @@ function ProfileChart({
 
   const pMax = Math.max(...all.map((L) => L.hPa), 1000);
   const pMin = Math.min(...all.map((L) => L.hPa), 200);
-  const temps = all.flatMap((L) => [L.tC!, L.tdC].filter((x): x is number => x != null));
-  const tMin = Math.min(...temps) - 5;
-  const tMax = Math.max(...temps) + 5;
+  const temps = all.flatMap((L) => [L.tC!, L.tdC].filter((x): x is number => x != null)).map(cToF);
+  const tMin = Math.min(...temps) - 8;
+  const tMax = Math.max(...temps) + 8;
 
   const yOf = (hPa: number) => {
     const logP = Math.log(hPa);
@@ -66,8 +73,8 @@ function ProfileChart({
     const logMin = Math.log(pMin);
     return padT + ((logMax - logP) / (logMax - logMin || 1)) * (H - padT - padB);
   };
-  const xOf = (tC: number) =>
-    padL + ((tC - tMin) / (tMax - tMin || 1)) * (W - padL - padR);
+  const xOf = (tF: number) =>
+    padL + ((tF - tMin) / (tMax - tMin || 1)) * (W - padL - padR);
 
   const pathFor = (levels: ChartLevel[], field: "tC" | "tdC") => {
     const pts = levels.filter((L) => L[field] != null);
@@ -75,7 +82,7 @@ function ProfileChart({
     return pts
       .map(
         (L, i) =>
-          (i === 0 ? "M" : "L") + " " + xOf(L[field]!).toFixed(1) + " " + yOf(L.hPa).toFixed(1)
+          (i === 0 ? "M" : "L") + " " + xOf(cToF(L[field]!)).toFixed(1) + " " + yOf(L.hPa).toFixed(1)
       )
       .join(" ");
   };
@@ -112,7 +119,7 @@ function ProfileChart({
             </text>
           ))}
       <text x={padL} y={H - 8} fill="#8fa6a8" fontSize={8}>
-        {(showModel ? "Model T/Td  " : "") + (showObs ? "Obs balloon  " : "") + "hPa"}
+        {(showModel ? "Model T/Td  " : "") + (showObs ? "Obs balloon  " : "") + "°F · hPa"}
       </text>
     </svg>
   );
@@ -182,7 +189,7 @@ export default function SkewTPanel({ lat, lng, onClose }: Props) {
           <div className="eyebrow" style={{ color: "#d9ff4a" }}>Tap sounding</div>
           <strong style={{ fontSize: 14 }}>{lat.toFixed(2)}, {lng.toFixed(2)}</strong>
           {s?.elevationM != null && (
-            <div className="small muted">{Math.round(s.elevationM)} m elev · model GFS</div>
+            <div className="small muted">{Math.round(mToFt(s.elevationM)).toLocaleString()} ft elev · model GFS</div>
           )}
         </div>
         <button type="button" className="chase-btn" onClick={onClose} style={{ padding: "6px 10px" }}>CLOSE</button>
@@ -228,6 +235,32 @@ export default function SkewTPanel({ lat, lng, onClose }: Props) {
         <div className="small" style={{ marginTop: 10, color: "#ff9f43" }}>Observed RAOB fetch failed — model still available.</div>
       )}
 
+      {status === "ok" && s && (s.t2m != null || s.td2m != null) && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 10, marginBottom: 4 }}>
+          <div style={{ background: "rgba(255,159,67,0.12)", borderRadius: 10, padding: "8px 10px", border: "1px solid rgba(255,159,67,0.3)" }}>
+            <div className="small muted">Temp</div>
+            <div style={{ fontWeight: 800, color: "#ff9f43", fontSize: 18 }}>
+              {s.t2m != null ? Math.round(cToF(s.t2m)) : "—"}°F
+            </div>
+            <div className="small muted">{s.t2m != null ? Math.round(s.t2m) + "°C" : ""}</div>
+          </div>
+          <div style={{ background: "rgba(82,224,208,0.12)", borderRadius: 10, padding: "8px 10px", border: "1px solid rgba(82,224,208,0.3)" }}>
+            <div className="small muted">Dewpoint</div>
+            <div style={{ fontWeight: 800, color: "#52e0d0", fontSize: 18 }}>
+              {s.td2m != null ? Math.round(cToF(s.td2m)) : "—"}°F
+            </div>
+            <div className="small muted">{s.td2m != null ? Math.round(s.td2m) + "°C" : ""}</div>
+          </div>
+          <div style={{ background: "rgba(237,248,247,0.06)", borderRadius: 10, padding: "8px 10px", border: "1px solid rgba(184,221,225,0.2)" }}>
+            <div className="small muted">Wind</div>
+            <div style={{ fontWeight: 800, color: "#edf8f7", fontSize: 18 }}>
+              {s.wind10Kt != null ? Math.round(s.wind10Kt) : "—"} <span style={{ fontSize: 11 }}>kt</span>
+            </div>
+            <div className="small muted">{s.wind10Dir != null ? Math.round(s.wind10Dir) + "°" : "surface"}</div>
+          </div>
+        </div>
+      )}
+
       {status === "ok" && s && (mode === "both" || mode === "model") && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginTop: 10, marginBottom: 10 }}>
           <div style={{ background: "rgba(217,255,74,0.08)", borderRadius: 10, padding: "8px 10px", border: "1px solid rgba(217,255,74,0.2)" }}>
@@ -254,7 +287,7 @@ export default function SkewTPanel({ lat, lng, onClose }: Props) {
 
       <div className="small muted" style={{ marginTop: 8, lineHeight: 1.45 }}>
         <strong style={{ color: "#edf8f7" }}>White/lime</strong> = real radiosonde (balloon).{" "}
-        <strong style={{ color: "#ff9f43" }}>Orange/cyan</strong> = GFS model at tap point. CAPE/CIN/shear are model-derived.
+        <strong style={{ color: "#ff9f43" }}>Orange/cyan</strong> = GFS model at tap point. CAPE/CIN/shear are model-derived. Surface temp is model 2 m air temp at the tap point (°F).
       </div>
     </div>
   );
