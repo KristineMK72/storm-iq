@@ -55,7 +55,7 @@ if (!t.includes("mapShare")) {
   );
 }
 
-// Forecast point timeline — cyclone cards (not plain white tips)
+// Forecast point timeline — cyclone cards
 t = t.replace(
   `pointToLayer: (_f, latlng) =>
                   L.circleMarker(latlng, {
@@ -107,7 +107,6 @@ t = t.replace(
   "style: { color, weight: 3.5, opacity: 1 }"
 );
 
-// Layer defaults from URL
 t = t.replace(
   "const [radarOn, setRadarOn] = useState(true);",
   "const [radarOn, setRadarOn] = useState(() => parseMapShare().radar ?? true);"
@@ -127,7 +126,6 @@ if (!t.includes("shareNote")) {
   );
 }
 
-// Map center/zoom from URL
 t = t.replace(
   `const map = L.map(mapRef.current, {
       center: [39.5, -98.0],
@@ -143,7 +141,12 @@ t = t.replace(
       zoomControl: true,
       minZoom: 3,
       maxZoom: 12,
-    });`
+    });
+    if (!map.getPane("outlookPane")) {
+      map.createPane("outlookPane");
+      const op = map.getPane("outlookPane");
+      if (op) op.style.zIndex = "450";
+    }`
 );
 
 if (!t.includes("syncMapShareToUrl")) {
@@ -219,13 +222,115 @@ if (!t.includes("<MapLayerLegends")) {
   );
 }
 
-// SHARE button
 if (!t.includes("shareMapView({")) {
   t = t.replace(
     "style={btnStyle(false)}\n          >\n            ↻\n          </button>",
     "style={btnStyle(false)}\n          >\n            ↻\n          </button>\n            <button\n              type=\"button\"\n              onClick={async () => {\n                const map = mapInstance.current;\n                if (!map) return;\n                const c = map.getCenter();\n                const result = await shareMapView({\n                  lat: c.lat,\n                  lng: c.lng,\n                  z: map.getZoom(),\n                  radar: radarOn,\n                  clouds: cloudsOn,\n                  tropical: showTropical,\n                });\n                setShareNote(result === \"shared\" ? \"Shared\" : result === \"copied\" ? \"Link copied\" : \"Could not share\");\n                window.setTimeout(() => setShareNote(\"\"), 2500);\n              }}\n              style={btnStyle(!!shareNote)}\n              title=\"Share this map view\"\n            >\n              {shareNote || \"🔗 SHARE\"}\n            </button>"
   );
 }
+
+// SPC Outlook visibility: stronger fills, torn/wind, pane above radar
+t = t.replace(
+  `try {
+          const res = await fetch("https://www.spc.noaa.gov/products/outlook/day1otlk_cat.nolyr.geojson");
+          if (res.ok) {
+            const geo = await res.json();
+            for (const f of geo?.features || []) {
+              const label = (f.properties?.LABEL || "").toUpperCase();
+              const color =
+                label === "HIGH" ? "#ff2d55" : label === "MDT" ? "#ff5c5c" : label === "ENH" ? "#ff9f43" : label === "SLGT" ? "#ffd166" : label === "MRGL" ? "#52e0d0" : "#4a6670";
+              L.geoJSON(f, {
+                style: { color, weight: 2, fillColor: color, fillOpacity: label === "TSTM" ? 0.08 : 0.22 },
+              }).addTo(tornLayerRef.current!);
+            }
+          }
+        } catch { /* */ }
+
+        try {
+          const res = await fetch("https://www.spc.noaa.gov/products/outlook/day1otlk_hail.nolyr.geojson");
+          if (res.ok) {
+            const geo = await res.json();
+            for (const f of geo?.features || []) {
+              L.geoJSON(f, {
+                style: { color: "#c084fc", weight: 1.5, fillColor: "#c084fc", fillOpacity: 0.2, dashArray: "4 3" },
+              }).addTo(hailLayerRef.current!);
+            }
+          }
+        } catch { /* */ }`,
+  `const outlookLabels: string[] = [];
+        const catColor = (label: string) =>
+          label === "HIGH" ? "#cc33ff" : label === "MDT" ? "#ff3333" : label === "ENH" ? "#ff9933" : label === "SLGT" ? "#ffe066" : label === "MRGL" ? "#66cc66" : label === "TSTM" ? "#9aa5a8" : "#4a6670";
+        const catFill = (label: string) =>
+          label === "HIGH" ? 0.45 : label === "MDT" ? 0.4 : label === "ENH" ? 0.35 : label === "SLGT" ? 0.32 : label === "MRGL" ? 0.28 : 0.14;
+        try {
+          const res = await fetch("https://www.spc.noaa.gov/products/outlook/day1otlk_cat.nolyr.geojson");
+          if (res.ok) {
+            const geo = await res.json();
+            for (const f of geo?.features || []) {
+              const label = String(f.properties?.LABEL || f.properties?.label || "").toUpperCase();
+              if (label && !outlookLabels.includes(label)) outlookLabels.push(label);
+              const color = catColor(label);
+              L.geoJSON(f as any, {
+                pane: "outlookPane",
+                style: { color, weight: label === "TSTM" ? 1.5 : 2.5, fillColor: color, fillOpacity: catFill(label), opacity: 0.95 },
+                onEachFeature: (feat, layer) => {
+                  const lab = String(feat.properties?.LABEL || "").toUpperCase() || "Outlook";
+                  layer.bindPopup("<strong style=\\"color:#edf8f7\\">SPC Day 1 · " + lab + "</strong><br/><span style=\\"color:#8fa6a8\\">Categorical severe outlook</span>");
+                },
+              }).addTo(tornLayerRef.current!);
+            }
+          }
+        } catch { /* */ }
+
+        for (const [url, stroke, name] of [
+          ["https://www.spc.noaa.gov/products/outlook/day1otlk_torn.nolyr.geojson", "#ff2d55", "Tornado"],
+          ["https://www.spc.noaa.gov/products/outlook/day1otlk_wind.nolyr.geojson", "#ffd166", "Wind"],
+        ] as const) {
+          try {
+            const res = await fetch(url);
+            if (!res.ok) continue;
+            const geo = await res.json();
+            for (const f of geo?.features || []) {
+              const lab = String(f.properties?.LABEL || f.properties?.label || name);
+              L.geoJSON(f as any, {
+                pane: "outlookPane",
+                style: { color: stroke, weight: 2, fillColor: stroke, fillOpacity: 0.18, opacity: 0.9, dashArray: "5 4" },
+                onEachFeature: (feat, layer) => {
+                  layer.bindPopup("<strong style=\\"color:#edf8f7\\">SPC Day 1 · " + name + "</strong><br/><span style=\\"color:#8fa6a8\\">" + lab + "</span>");
+                },
+              }).addTo(tornLayerRef.current!);
+            }
+          } catch { /* */ }
+        }
+
+        try {
+          const res = await fetch("https://www.spc.noaa.gov/products/outlook/day1otlk_hail.nolyr.geojson");
+          if (res.ok) {
+            const geo = await res.json();
+            for (const f of geo?.features || []) {
+              const lab = String(f.properties?.LABEL || f.properties?.label || "Hail");
+              L.geoJSON(f as any, {
+                pane: "outlookPane",
+                style: { color: "#c084fc", weight: 2, fillColor: "#c084fc", fillOpacity: 0.22, dashArray: "4 3", opacity: 0.95 },
+                onEachFeature: (feat, layer) => {
+                  layer.bindPopup("<strong style=\\"color:#edf8f7\\">SPC Day 1 · Hail</strong><br/><span style=\\"color:#8fa6a8\\">" + lab + "</span>");
+                },
+              }).addTo(hailLayerRef.current!);
+            }
+          }
+        } catch { /* */ }
+        (mapInstance.current as any)._outlookLabels = outlookLabels;`
+);
+
+t = t.replace(
+  'setStatus(n + " alert features · SPC outlook");',
+  'const ol = ((mapInstance.current as any)._outlookLabels || []) as string[];\n          setStatus(n + " alert features · SPC " + (ol.length ? ol.join("/") : "outlook"));'
+);
+
+t = t.replace(
+  '{showTorn ? "OUTLOOK ON" : "OUTLOOK"}',
+  '{showTorn ? "SPC DAY 1 ON" : "SPC DAY 1"}'
+);
 
 fs.writeFileSync(out, t);
 console.log("restore-stormmap: wrote", out, "(" + t.length + " bytes)");
