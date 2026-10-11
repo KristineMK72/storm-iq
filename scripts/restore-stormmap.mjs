@@ -66,8 +66,21 @@ if (!t.includes("setSoundingPt({")) {
   );
 }
 if (!t.includes("<SkewTPanel")) {
-  t = t.replace(
-    `            CLEAR
+  if (t.includes("<MapLayerLegends")) {
+    t = t.replace(
+      "    <MapLayerLegends />",
+      `      {soundingPt && (
+        <SkewTPanel
+          lat={soundingPt.lat}
+          lng={soundingPt.lng}
+          onClose={() => setSoundingPt(null)}
+        />
+      )}
+    <MapLayerLegends />`
+    );
+  } else {
+    t = t.replace(
+      `            CLEAR
             </button>
           </div>
         </div>
@@ -75,7 +88,7 @@ if (!t.includes("<SkewTPanel")) {
     </div>
   );
 }`,
-    `            CLEAR
+      `            CLEAR
             </button>
           </div>
         </div>
@@ -90,7 +103,8 @@ if (!t.includes("<SkewTPanel")) {
     </div>
   );
 }`
-  );
+    );
+  }
 }
 
 fs.writeFileSync(out, t);
