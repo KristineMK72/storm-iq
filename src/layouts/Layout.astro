@@ -4,11 +4,14 @@ import "../styles/extras.css";
 
 const {
   title = "Storm IQ",
-  description = "Live storm intelligence for safer storm observation — NWS alerts, SPC outlooks, radar, and chase targeting across the United States."
+  description = "Live storm intelligence for safer storm observation — NWS alerts, SPC outlooks, radar, and chase targeting across the United States.",
+  ogImage: ogImageProp,
+  ogUrl: ogUrlProp,
 } = Astro.props;
 
 const site = "https://storm-iq.vercel.app";
-const ogImage = `${site}/og.svg`;
+const ogImage = ogImageProp || `${site}/og.svg`;
+const ogUrl = ogUrlProp || site;
 const path = Astro.url.pathname;
 
 function isActive(href: string) {
@@ -38,10 +41,11 @@ function isActive(href: string) {
     <meta property="og:site_name" content="Storm IQ" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
-    <meta property="og:url" content={site} />
+    <meta property="og:url" content={ogUrl} />
     <meta property="og:image" content={ogImage} />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
+    <meta property="og:image:type" content={ogImage.includes("/api/og") ? "image/png" : "image/svg+xml"} />
 
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />

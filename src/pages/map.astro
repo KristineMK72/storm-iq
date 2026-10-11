@@ -1,9 +1,40 @@
 ---
+export const prerender = false;
+
 import Layout from "../layouts/Layout.astro";
 import ChaseModeMap from "../components/ChaseModeMap";
+
+const site = "https://storm-iq.vercel.app";
+const params = Astro.url.searchParams;
+const lat = params.get("lat");
+const lng = params.get("lng");
+const z = params.get("z") || "5";
+
+const hasView = lat != null && lng != null && Number.isFinite(parseFloat(lat)) && Number.isFinite(parseFloat(lng));
+
+const ogImage = hasView
+  ? `${site}/api/og?lat=${encodeURIComponent(lat!)}&lng=${encodeURIComponent(lng!)}&z=${encodeURIComponent(z)}`
+  : `${site}/og.svg`;
+
+const ogTitle = hasView
+  ? `Storm IQ map · ${parseFloat(lat!).toFixed(2)}°, ${parseFloat(lng!).toFixed(2)}°`
+  : "Storm IQ | Map";
+
+const ogDescription = hasView
+  ? "Live Storm IQ map view — radar, alerts, and tropical tracks at this location."
+  : "Live NWS alerts, radar, SPC outlooks, and tropical tracks.";
+
+const ogUrl = hasView
+  ? `${site}/map?lat=${encodeURIComponent(lat!)}&lng=${encodeURIComponent(lng!)}&z=${encodeURIComponent(z)}`
+  : `${site}/map`;
 ---
 
-<Layout title="Storm IQ | Map">
+<Layout
+  title={ogTitle}
+  description={ogDescription}
+  ogImage={ogImage}
+  ogUrl={ogUrl}
+>
 
   <div class="page-head">
     <div class="eyebrow">National operations map</div>
