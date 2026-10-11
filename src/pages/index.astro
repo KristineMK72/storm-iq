@@ -2,7 +2,6 @@
 import Layout from "../layouts/Layout.astro";
 import ChaseScore from "../components/ChaseScore";
 import TargetBoard from "../components/TargetBoard";
-import ChaseModeMap from "../components/ChaseModeMap";
 import ThreatStrip from "../components/ThreatStrip";
 import MesoLinks from "../components/MesoLinks";
 ---
@@ -18,11 +17,11 @@ import MesoLinks from "../components/MesoLinks";
         IS GOING.
       </h1>
       <p>
-        Live map, alerts, and chase targets in one place.
-        Forecast models and settings live on their own pages so this stays the ops desk.
+        Command desk for scores, targets, and meso links.
+        The live map is full-screen on its own page so nothing gets in the way.
       </p>
       <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:16px">
-        <a href="/map" class="chase-btn chase-btn-on" style="text-decoration:none">Open map</a>
+        <a href="/map" class="chase-btn chase-btn-on" style="text-decoration:none">Open full map</a>
         <a href="/forecast" class="chase-btn" style="text-decoration:none">Forecast</a>
         <a href="/settings" class="chase-btn" style="text-decoration:none">Settings</a>
       </div>
@@ -37,6 +36,9 @@ import MesoLinks from "../components/MesoLinks";
         Storm IQ does not replace NWS warnings. If a warning conflicts with a target
         recommendation, follow the official warning and move to safety.
       </div>
+      <p style="margin-top:14px">
+        <a href="/map" class="chase-btn chase-btn-on" style="text-decoration:none;display:inline-block">⚡ Full-screen map</a>
+      </p>
     </div>
   </section>
 
@@ -47,24 +49,13 @@ import MesoLinks from "../components/MesoLinks";
     <TargetBoard client:only="react" />
   </div>
 
-  <div class="card" style="margin-top:18px">
-    <div class="section-title">
-      <div>
-        <div class="eyebrow">National view</div>
-        <h2>Live operations map</h2>
-      </div>
-      <span class="small muted">CHASE MODE · NWS + SPC</span>
-    </div>
-    <ChaseModeMap client:only="react" />
-  </div>
-
   <MesoLinks client:only="react" />
 
   <div class="notice" style="margin-top:18px">
     <strong>Quick links:</strong>
+    <a href="/map" style="color:var(--lime)">Full map</a> ·
     <a href="/forecast" style="color:var(--lime)">Forecast</a> ·
     <a href="/settings" style="color:var(--lime)">Settings</a> ·
-    <a href="/map" style="color:var(--lime)">Full map</a> ·
     <a href="/alerts" style="color:var(--lime)">Alerts</a>
   </div>
 

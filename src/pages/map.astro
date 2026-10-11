@@ -22,7 +22,7 @@ const ogTitle = hasView
 
 const ogDescription = hasView
   ? "Live Storm IQ map view — radar, alerts, and tropical tracks at this location."
-  : "Live NWS alerts, radar, SPC outlooks, and tropical tracks.";
+  : "Full-screen live map — radar, SPC outlooks, alerts, tropical tracks, and tap soundings.";
 
 const ogUrl = hasView
   ? `${site}/map?lat=${encodeURIComponent(lat!)}&lng=${encodeURIComponent(lng!)}&z=${encodeURIComponent(z)}`
@@ -34,35 +34,7 @@ const ogUrl = hasView
   description={ogDescription}
   ogImage={ogImage}
   ogUrl={ogUrl}
+  immersive={true}
 >
-
-  <div class="page-head">
-    <div class="eyebrow">National operations map</div>
-    <h1>STORM MAP</h1>
-    <p>
-      Live NWS alerts, radar, SPC Day 1 risk, and tropical tracks.
-      Use <strong style="color:var(--lime)">Chase Mode</strong> for a taller field map.
-      Forecast outlooks moved to <a href="/forecast" style="color:var(--lime)">Forecast</a>.
-    </p>
-  </div>
-
-  <div class="card">
-    <div class="section-title">
-      <div>
-        <div class="eyebrow">Now</div>
-        <h2>Live operations</h2>
-      </div>
-      <span class="small muted">DAY 1 + ALERTS + TROPICAL</span>
-    </div>
-    <ChaseModeMap client:only="react" />
-  </div>
-
-  <div class="notice" style="margin-top:18px">
-    <strong>LIVE DATA:</strong>
-    Radar, Day 1 outlook, alert polygons, NHC tracks.
-    Day 2 / Day 3 targets and model tables →
-    <a href="/forecast" style="color:var(--lime)">Forecast</a>.
-    Official NWS warnings always take priority.
-  </div>
-
+  <ChaseModeMap client:only="react" immersive={true} />
 </Layout>
