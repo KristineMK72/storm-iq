@@ -4,5 +4,11 @@
       "source": "/api/nhc/current",
       "destination": "https://www.nhc.noaa.gov/CurrentStorms.json"
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/push-outlook",
+      "schedule": "0 12,18 * * *"
+    }
   ]
 }
