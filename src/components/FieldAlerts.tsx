@@ -44,7 +44,6 @@ function getCentroid(geometry: any): [number, number] | null {
   return n ? [lat / n, lng / n] : null;
 }
 
-/** Ray-casting point-in-ring. ring is [[lng, lat], ...] */
 function pointInRing(lng: number, lat: number, ring: number[][]): boolean {
   let inside = false;
   for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
@@ -141,7 +140,24 @@ async function subscribePush(home: { lat: number; lng: number } | null) {
       }),
     });
   } catch {
-    // ignore — foreground notifications still work
+    // ignore
+  }
+}
+
+async function testPush() {
+  try {
+    const reg = await navigator.serviceWorker?.ready;
+    const sub = await reg?.pushManager.getSubscription();
+    const res = await fetch("/api/push-test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subscription: sub?.toJSON() }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "failed");
+    return "Test sent — check your notification shade";
+  } catch (e: any) {
+    return "Test failed: " + (e?.message || "unknown");
   }
 }
 
@@ -189,7 +205,7 @@ async function checkSpcOutlooks(home: { lat: number; lng: number }, seen: Set<st
       await showNote(title, body, key, "/forecast");
       lastMsg = title;
     } catch {
-      // ignore single day failure
+      // ignore
     }
   }
 
@@ -200,6 +216,8 @@ export default function FieldAlerts() {
   const [perm, setPerm] = useState<NotificationPermission | "unsupported">("default");
   const [enabled, setEnabled] = useState(false);
   const [status, setStatus] = useState("");
+  const [testStatus, setTestStatus] = useState("");
+  const [testing, setTesting] = useState(false);
   const [canInstall, setCanInstall] = useState(false);
   const deferredPrompt = useRef<any>(null);
   const seenRef = useRef<Set<string>>(new Set());
@@ -393,6 +411,23 @@ export default function FieldAlerts() {
           </button>
         )}
 
+        {perm === "granted" && enabled && (
+          <button
+            type="button"
+            className="chase-btn"
+            disabled={testing}
+            onClick={async () => {
+              setTesting(true);
+              setTestStatus("");
+              const msg = await testPush();
+              setTestStatus(msg);
+              setTesting(false);
+            }}
+          >
+            {testing ? "SENDING…" : "TEST PUSH"}
+          </button>
+        )}
+
         {perm === "denied" && (
           <span className="small muted">
             Notifications blocked — enable in browser settings
@@ -403,6 +438,11 @@ export default function FieldAlerts() {
       {status && (
         <p className="small muted" style={{ marginTop: 12 }}>
           {status}
+        </p>
+      )}
+      {testStatus && (
+        <p className="small" style={{ marginTop: 8, color: "var(--lime)" }}>
+          {testStatus}
         </p>
       )}
 
