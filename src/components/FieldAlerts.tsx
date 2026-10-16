@@ -6,6 +6,8 @@ const PREF_KEY = "stormiq-notify-on";
 const RADIUS_MI = 150;
 const POLL_MS = 90_000;
 
+const CHASE_RISKS = new Set(["MRGL", "SLGT", "ENH", "MDT", "HIGH"]);
+
 function getCentroid(geometry: any): [number, number] | null {
   if (!geometry) return null;
   let coords: number[][] = [];
@@ -31,12 +33,40 @@ function getCentroid(geometry: any): [number, number] | null {
   return n ? [lat / n, lng / n] : null;
 }
 
+/** Ray-casting point-in-ring. ring is [[lng, lat], ...] */
+function pointInRing(lng: number, lat: number, ring: number[][]): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i][0], yi = ring[i][1];
+    const xj = ring[j][0], yj = ring[j][1];
+    const intersect = ((yi > lat) !== (yj > lat)) &&
+      (lng < (xj - xi) * (lat - yi) / (yj - yi + 0.0) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+function pointInGeometry(lng: number, lat: number, geometry: any): boolean {
+  if (!geometry) return false;
+  if (geometry.type === "Polygon") {
+    const rings = geometry.coordinates || [];
+    if (!rings.length || !pointInRing(lng, lat, rings[0])) return false;
+    return true;
+  }
+  if (geometry.type === "MultiPolygon") {
+    for (const poly of geometry.coordinates || []) {
+      if (poly?.[0] && pointInRing(lng, lat, poly[0])) return true;
+    }
+  }
+  return false;
+}
+
 function loadSeen(): Set<string> {
   try {
     const raw = localStorage.getItem(SEEN_KEY);
     if (!raw) return new Set();
     const arr = JSON.parse(raw) as string[];
-    return new Set(arr.slice(-200));
+    return new Set(arr.slice(-300));
   } catch {
     return new Set();
   }
@@ -44,7 +74,7 @@ function loadSeen(): Set<string> {
 
 function saveSeen(seen: Set<string>) {
   try {
-    localStorage.setItem(SEEN_KEY, JSON.stringify([...seen].slice(-200)));
+    localStorage.setItem(SEEN_KEY, JSON.stringify([...seen].slice(-300)));
   } catch {
     // ignore
   }
@@ -58,6 +88,76 @@ function isPriority(event: string): boolean {
     e.includes("flash flood warning") ||
     (e.includes("warning") && e.includes("tornado"))
   );
+}
+
+async function showNote(title: string, body: string, tag: string, url = "/map") {
+  if (Notification.permission !== "granted") return;
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration();
+    if (reg?.showNotification) {
+      await reg.showNotification(title, {
+        body,
+        tag,
+        data: { url },
+        icon: "/og.svg",
+      });
+    } else {
+      new Notification(title, { body, tag });
+    }
+  } catch {
+    // ignore
+  }
+}
+
+async function checkSpcOutlooks(home: { lat: number; lng: number }, seen: Set<string>): Promise<string | null> {
+  const days = [
+    { day: 1, url: "https://www.spc.noaa.gov/products/outlook/day1otlk_cat.lyr.geojson" },
+    { day: 2, url: "https://www.spc.noaa.gov/products/outlook/day2otlk_cat.lyr.geojson" },
+  ];
+
+  let lastMsg: string | null = null;
+
+  for (const { day, url } of days) {
+    try {
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) continue;
+      const data = await res.json();
+
+      let best: { label: string; label2: string; issue: string } | null = null;
+      const order = ["HIGH", "MDT", "ENH", "SLGT", "MRGL"];
+
+      for (const f of data?.features || []) {
+        const p = f.properties || {};
+        const label = String(p.LABEL || "").toUpperCase();
+        if (!CHASE_RISKS.has(label)) continue;
+        if (!pointInGeometry(home.lng, home.lat, f.geometry)) continue;
+
+        if (!best || order.indexOf(label) < order.indexOf(best.label)) {
+          best = {
+            label,
+            label2: p.LABEL2 || label,
+            issue: String(p.ISSUE || p.ISSUE_ISO || ""),
+          };
+        }
+      }
+
+      if (!best) continue;
+
+      const key = `spc-d${day}-${best.issue}-${best.label}`;
+      if (seen.has(key)) continue;
+
+      seen.add(key);
+      const when = day === 1 ? "today" : "tomorrow";
+      const title = `Day ${day} ${best.label} Risk`;
+      const body = `${best.label2} near home base — potential chase setup ${when}. Tap for map.`;
+      await showNote(title, body, key, "/forecast");
+      lastMsg = title;
+    } catch {
+      // ignore single day failure
+    }
+  }
+
+  return lastMsg;
 }
 
 export default function FieldAlerts() {
@@ -107,11 +207,12 @@ export default function FieldAlerts() {
     async function check() {
       const home = loadHomeBase();
       if (!home) {
-        setStatus("Set Home base to watch nearby warnings");
+        setStatus("Set Home base to watch nearby warnings + outlooks");
         return;
       }
 
       try {
+        // --- Active NWS warnings ---
         const res = await fetch("https://api.weather.gov/alerts/active", {
           headers: {
             "User-Agent": "StormIQ (https://storm-iq.vercel.app)",
@@ -148,33 +249,22 @@ export default function FieldAlerts() {
           seenRef.current.add(id);
           newCount++;
 
-          if (Notification.permission === "granted") {
-            const title = event;
-            const body = `${Math.round(dist)} mi away · ${p.headline || p.areaDesc || "Active warning"}`;
-            try {
-              const reg = await navigator.serviceWorker?.getRegistration();
-              if (reg?.showNotification) {
-                await reg.showNotification(title, {
-                  body,
-                  tag: id,
-                  data: { url: "/map" },
-                  icon: "/og.svg",
-                });
-              } else {
-                new Notification(title, { body, tag: id });
-              }
-            } catch {
-              // ignore
-            }
-          }
+          const title = event;
+          const body = `${Math.round(dist)} mi away · ${p.headline || p.areaDesc || "Active warning"}`;
+          await showNote(title, body, id, "/map");
         }
 
+        // --- SPC Day 1 / Day 2 chase outlooks ---
+        const outlookNote = await checkSpcOutlooks(home, seenRef.current);
+
         saveSeen(seenRef.current);
-        setStatus(
-          newCount
-            ? `Alerted on ${newCount} nearby warning${newCount === 1 ? "" : "s"}`
-            : `Watching within ${RADIUS_MI} mi · ${new Date().toLocaleTimeString()}`
-        );
+        if (cancelled) return;
+
+        const parts: string[] = [];
+        if (newCount) parts.push(`Alerted on ${newCount} nearby warning${newCount === 1 ? "" : "s"}`);
+        if (outlookNote) parts.push(outlookNote);
+        if (!parts.length) parts.push(`Watching warnings + Day 1/2 outlooks · ${new Date().toLocaleTimeString()}`);
+        setStatus(parts.join(" · "));
       } catch {
         if (!cancelled) setStatus("Could not check alerts — will retry");
       }
@@ -202,7 +292,7 @@ export default function FieldAlerts() {
       } catch {
         // ignore
       }
-      setStatus(`Watching warnings within ${RADIUS_MI} mi of home base`);
+      setStatus(`Watching warnings + Day 1/2 outlooks near home base`);
     }
   }
 
@@ -225,7 +315,6 @@ export default function FieldAlerts() {
     setCanInstall(false);
   }
 
-  // Compact UI when nested inside a parent card on Command
   return (
     <div style={{ marginTop: 4 }}>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
@@ -254,7 +343,7 @@ export default function FieldAlerts() {
 
         {perm !== "unsupported" && !enabled && (
           <button type="button" className="chase-btn" onClick={enableNotifications}>
-            ENABLE NEAR-ME ALERTS
+            ENABLE CHASE ALERTS
           </button>
         )}
 
@@ -282,8 +371,9 @@ export default function FieldAlerts() {
       )}
 
       <p className="small muted" style={{ marginTop: 10, lineHeight: 1.5 }}>
-        Needs Home base set above. Only new tornado / severe / flash-flood
-        warnings within ~{RADIUS_MI} mi. Does not replace phone emergency alerts.
+        Needs Home base set above. Alerts on new tornado / severe / flash-flood
+        warnings within ~{RADIUS_MI} mi, plus SPC Day 1 and Day 2 Marginal+ risk
+        over your base for advance chase heads-up. Does not replace phone emergency alerts.
       </p>
     </div>
   );
