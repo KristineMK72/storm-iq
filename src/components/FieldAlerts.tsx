@@ -6,6 +6,17 @@ const PREF_KEY = "stormiq-notify-on";
 const RADIUS_MI = 150;
 const POLL_MS = 90_000;
 
+const VAPID_PUBLIC_KEY = "BEWSGm5aEMjBxLg1gOX2mMyxNfJ6dVLjOzE2vWI0FdJpR-AHRBYvQN0b_ZZZ2e9kG-H6lgqHbGRq_OewH2YPSDo";
+
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(base64);
+  const output = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; ++i) output[i] = raw.charCodeAt(i);
+  return output;
+}
+
 const CHASE_RISKS = new Set(["MRGL", "SLGT", "ENH", "MDT", "HIGH"]);
 
 function getCentroid(geometry: any): [number, number] | null {
@@ -106,6 +117,31 @@ async function showNote(title: string, body: string, tag: string, url = "/map") 
     }
   } catch {
     // ignore
+  }
+}
+
+async function subscribePush(home: { lat: number; lng: number } | null) {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      });
+    }
+    await fetch("/api/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        subscription: sub.toJSON(),
+        lat: home?.lat,
+        lng: home?.lng,
+      }),
+    });
+  } catch {
+    // ignore — foreground notifications still work
   }
 }
 
@@ -212,7 +248,6 @@ export default function FieldAlerts() {
       }
 
       try {
-        // --- Active NWS warnings ---
         const res = await fetch("https://api.weather.gov/alerts/active", {
           headers: {
             "User-Agent": "StormIQ (https://storm-iq.vercel.app)",
@@ -254,8 +289,8 @@ export default function FieldAlerts() {
           await showNote(title, body, id, "/map");
         }
 
-        // --- SPC Day 1 / Day 2 chase outlooks ---
         const outlookNote = await checkSpcOutlooks(home, seenRef.current);
+        subscribePush(home);
 
         saveSeen(seenRef.current);
         if (cancelled) return;
@@ -293,6 +328,7 @@ export default function FieldAlerts() {
         // ignore
       }
       setStatus(`Watching warnings + Day 1/2 outlooks near home base`);
+      subscribePush(loadHomeBase());
     }
   }
 
@@ -373,7 +409,8 @@ export default function FieldAlerts() {
       <p className="small muted" style={{ marginTop: 10, lineHeight: 1.5 }}>
         Needs Home base set above. Alerts on new tornado / severe / flash-flood
         warnings within ~{RADIUS_MI} mi, plus SPC Day 1 and Day 2 Marginal+ risk
-        over your base for advance chase heads-up. Does not replace phone emergency alerts.
+        over your base for advance chase heads-up. Background push works when
+        the app is installed and notifications are allowed. Does not replace phone emergency alerts.
       </p>
     </div>
   );
