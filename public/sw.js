@@ -1,4 +1,4 @@
-/* Storm IQ service worker — offline shell + notification clicks */
+/* Storm IQ service worker — offline shell + push notifications */
 const CACHE = "stormiq-v1";
 const PRECACHE = ["/", "/map", "/targets", "/alerts", "/og.svg", "/manifest.webmanifest"];
 
@@ -21,7 +21,6 @@ self.addEventListener("fetch", (event) => {
   if (req.method !== "GET") return;
 
   const url = new URL(req.url);
-  // Don't cache live weather APIs
   if (
     url.hostname.includes("weather.gov") ||
     url.hostname.includes("spc.noaa.gov") ||
@@ -44,6 +43,24 @@ self.addEventListener("fetch", (event) => {
         })
         .catch(() => cached);
       return cached || network;
+    })
+  );
+});
+
+self.addEventListener("push", (event) => {
+  let data = { title: "Storm IQ", body: "Chase alert", url: "/map" };
+  try {
+    if (event.data) data = { ...data, ...event.data.json() };
+  } catch {
+    // ignore
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title || "Storm IQ", {
+      body: data.body || "",
+      icon: "/og.svg",
+      badge: "/icon-192.svg",
+      tag: data.tag || "stormiq",
+      data: { url: data.url || "/map" },
     })
   );
 });
