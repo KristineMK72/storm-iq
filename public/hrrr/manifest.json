@@ -1,8 +1,8 @@
 {
-  "updated": "2026-10-19T20:36:44Z",
-  "valid": "2026-10-19T21:36:37Z",
+  "updated": "2026-10-20T00:22:34Z",
+  "valid": "2026-10-20T01:22:08Z",
   "model": "HRRR",
-  "run": "20261019_20",
+  "run": "20261020_00",
   "forecastHour": 1,
   "bounds": [
     [
@@ -29,8 +29,13 @@
   "frames": [
     {
       "fxx": 1,
-      "valid": "2026-10-19T21:36:37Z",
+      "valid": "2026-10-20T01:22:08Z",
       "url": "/hrrr/refl.png"
+    },
+    {
+      "fxx": 3,
+      "valid": "2026-10-20T03:22:08Z",
+      "url": "/hrrr/refl_f03.png"
     }
   ],
   "note": "refl unavailable this run; cape unavailable this run; refl kept from previous good run; cape kept from previous good run"
