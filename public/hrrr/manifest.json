@@ -1,8 +1,8 @@
 {
-  "updated": "2026-10-23T17:09:53Z",
-  "valid": "2026-10-23T18:09:47Z",
+  "updated": "2026-10-23T21:28:02Z",
+  "valid": "2026-10-23T22:27:22Z",
   "model": "HRRR",
-  "run": "20261023_17",
+  "run": "20261023_21",
   "forecastHour": 1,
   "bounds": [
     [
@@ -29,13 +29,18 @@
   "frames": [
     {
       "fxx": 1,
-      "valid": "2026-10-23T18:09:47Z",
+      "valid": "2026-10-23T22:27:22Z",
       "url": "/hrrr/refl.png"
     },
     {
       "fxx": 3,
-      "valid": "2026-10-23T20:09:47Z",
+      "valid": "2026-10-24T00:27:22Z",
       "url": "/hrrr/refl_f03.png"
+    },
+    {
+      "fxx": 6,
+      "valid": "2026-10-24T03:27:22Z",
+      "url": "/hrrr/refl_f06.png"
     }
   ],
   "note": "refl unavailable this run; cape unavailable this run; refl kept from previous good run; cape kept from previous good run"
