@@ -6,6 +6,7 @@ import {
   type Sounding,
 } from "../lib/sounding";
 import { fetchNearestObserved, type ObservedSounding } from "../lib/raob";
+import { fetchExtendedForecast, formatDay, weatherEmoji, weatherLabel, type ExtendedForecast } from "../lib/forecast";
 
 function cToF(c: number): number {
   return (c * 9) / 5 + 32;
@@ -131,13 +132,17 @@ export default function SkewTPanel({ lat, lng, onClose }: Props) {
   const [obs, setObs] = useState<ObservedSounding | null>(null);
   const [obsStatus, setObsStatus] = useState<"loading" | "ok" | "none" | "error">("loading");
   const [mode, setMode] = useState<Mode>("both");
+  const [forecast, setForecast] = useState<ExtendedForecast | null>(null);
+  const [forecastStatus, setForecastStatus] = useState<"loading" | "ok" | "error">("loading");
 
   useEffect(() => {
     let cancelled = false;
     setStatus("loading");
     setObsStatus("loading");
+    setForecastStatus("loading");
     setS(null);
     setObs(null);
+    setForecast(null);
 
     fetchSounding(lat, lng)
       .then((data) => {
@@ -159,6 +164,16 @@ export default function SkewTPanel({ lat, lng, onClose }: Props) {
       })
       .catch(() => {
         if (!cancelled) setObsStatus("error");
+      });
+
+    fetchExtendedForecast(lat, lng)
+      .then((data) => {
+        if (cancelled) return;
+        setForecast(data);
+        setForecastStatus("ok");
+      })
+      .catch(() => {
+        if (!cancelled) setForecastStatus("error");
       });
 
     return () => {
@@ -285,9 +300,67 @@ export default function SkewTPanel({ lat, lng, onClose }: Props) {
         <ProfileChart modelLevels={modelLevels} obsLevels={obsLevels} mode={mode} />
       )}
 
+      {/* Extended forecast — precip / snow / rain */}
+      {forecastStatus === "loading" && (
+        <p className="small muted" style={{ marginTop: 12 }}>Loading extended forecast…</p>
+      )}
+      {forecastStatus === "ok" && forecast && forecast.days.length > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <div className="eyebrow" style={{ color: "#52e0d0", marginBottom: 6 }}>7-day outlook</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {forecast.days.slice(0, 7).map((day) => {
+              const hasSnow = day.snowCm != null && day.snowCm > 0.1;
+              const hasRain = day.rainMm != null && day.rainMm > 0.5;
+              const hasPrecip = day.precipMm != null && day.precipMm > 0.5;
+              return (
+                <div
+                  key={day.date}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "6px 8px",
+                    borderRadius: 8,
+                    background: "rgba(8,15,18,0.6)",
+                    border: "1px solid rgba(184,221,225,0.12)",
+                    fontSize: 12,
+                  }}
+                >
+                  <div style={{ width: 78, fontWeight: 700 }}>{formatDay(day.date)}</div>
+                  <div style={{ fontSize: 16 }}>{weatherEmoji(day.weatherCode)}</div>
+                  <div style={{ flex: 1, color: "#8fa6a8" }}>
+                    {weatherLabel(day.weatherCode)}
+                    {day.precipProb != null && day.precipProb > 10 && (
+                      <span> · {Math.round(day.precipProb)}%</span>
+                    )}
+                  </div>
+                  <div style={{ textAlign: "right", minWidth: 70 }}>
+                    {day.tempMaxF != null && day.tempMinF != null && (
+                      <div>{Math.round(day.tempMaxF)}° / {Math.round(day.tempMinF)}°</div>
+                    )}
+                    {hasSnow && (
+                      <div style={{ color: "#d9ff4a", fontWeight: 700 }}>{day.snowCm!.toFixed(1)} cm snow</div>
+                    )}
+                    {hasRain && !hasSnow && (
+                      <div style={{ color: "#52e0d0" }}>{day.rainMm!.toFixed(1)} mm rain</div>
+                    )}
+                    {hasPrecip && !hasSnow && !hasRain && (
+                      <div style={{ color: "#8fa6a8" }}>{day.precipMm!.toFixed(1)} mm</div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      {forecastStatus === "error" && (
+        <p className="small muted" style={{ marginTop: 10 }}>Extended forecast unavailable.</p>
+      )}
+
       <div className="small muted" style={{ marginTop: 8, lineHeight: 1.45 }}>
         <strong style={{ color: "#edf8f7" }}>White/lime</strong> = real radiosonde (balloon).{" "}
-        <strong style={{ color: "#ff9f43" }}>Orange/cyan</strong> = GFS model at tap point. CAPE/CIN/shear are model-derived. Surface temp is model 2 m air temp at the tap point (°F).
+        <strong style={{ color: "#ff9f43" }}>Orange/cyan</strong> = GFS model at tap point. CAPE/CIN/shear are model-derived. Surface temp is model 2 m air temp at the tap point (°F). 7-day precip/snow from Open-Meteo.
       </div>
     </div>
   );
