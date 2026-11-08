@@ -1,8 +1,8 @@
 {
-  "updated": "2026-11-08T10:25:33Z",
-  "valid": "2026-11-08T11:25:24Z",
+  "updated": "2026-11-08T17:57:09Z",
+  "valid": "2026-11-08T18:56:58Z",
   "model": "HRRR",
-  "run": "20261108_10",
+  "run": "20261108_17",
   "forecastHour": 1,
   "bounds": [
     [
@@ -29,19 +29,19 @@
   "frames": [
     {
       "fxx": 1,
-      "valid": "2026-11-08T11:25:24Z",
+      "valid": "2026-11-08T18:56:58Z",
       "url": "/hrrr/refl.png"
     },
     {
       "fxx": 3,
-      "valid": "2026-11-08T13:25:24Z",
+      "valid": "2026-11-08T20:56:58Z",
       "url": "/hrrr/refl_f03.png"
     },
     {
       "fxx": 6,
-      "valid": "2026-11-08T16:25:24Z",
+      "valid": "2026-11-08T23:56:58Z",
       "url": "/hrrr/refl_f06.png"
     }
   ],
-  "note": "refl unavailable this run; cape unavailable this run; refl kept from previous good run; cape kept from previous good run"
+  "note": "Model guidance only \u2014 not observations or NWS warnings."
 }
