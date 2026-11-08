@@ -179,11 +179,25 @@ if (!t.includes("Open official SPC Day 1")) {
   }
 }
 
-// ---- Premium animation: radar dual-layer crossfade ----
+// write moved
+
+// ---- Premium: radar crossfade + speed + HRRR crossfade ----
 if (!t.includes("radarLayerBRef")) {
   t = t.replace(
     "const radarLayerRef = useRef<L.TileLayer | null>(null);",
     "const radarLayerRef = useRef<L.TileLayer | null>(null);\n  const radarLayerBRef = useRef<L.TileLayer | null>(null);\n  const radarActiveRef = useRef<\"A\" | \"B\">(\"A\");\n  const radarSpeedRef = useRef(650);"
+  );
+  t = t.replace(
+    "const hrrrReflLayerRef = useRef<L.ImageOverlay | null>(null);",
+    "const hrrrReflLayerRef = useRef<L.ImageOverlay | null>(null);\n  const hrrrLayerBRef = useRef<L.ImageOverlay | null>(null);\n  const hrrrActiveRef = useRef<\"A\" | \"B\">(\"A\");"
+  );
+  t = t.replace(
+    'const [radarPlaying, setRadarPlaying] = useState(false);',
+    'const [radarPlaying, setRadarPlaying] = useState(false);\n  const [radarSpeed, setRadarSpeed] = useState(650);'
+  );
+  t = t.replace(
+    "useEffect(() => {\n    selectedRef.current = selected;\n  }, [selected]);",
+    "useEffect(() => {\n    selectedRef.current = selected;\n  }, [selected]);\n\n  useEffect(() => {\n    radarSpeedRef.current = radarSpeed;\n  }, [radarSpeed]);"
   );
 
   t = t.replace(
@@ -202,7 +216,7 @@ if (!t.includes("radarLayerBRef")) {
     radarLayerBRef.current = radarB;`
   );
 
-  const oldApply = `const applyRadarFrame = useCallback((idx: number) => {
+  const oldRadar = `const applyRadarFrame = useCallback((idx: number) => {
     const layer = radarLayerRef.current;
     if (!layer) return;
     const frame = RADAR_FRAMES[idx] ?? "";
@@ -210,8 +224,7 @@ if (!t.includes("radarLayerBRef")) {
     radarFrameRef.current = idx;
     setRadarFrame(idx);
   }, []);`;
-
-  const newApply = `const applyRadarFrame = useCallback((idx: number) => {
+  const newRadar = `const applyRadarFrame = useCallback((idx: number) => {
     const map = mapInstance.current;
     if (!map) return;
     const frame = RADAR_FRAMES[idx] ?? "";
@@ -245,13 +258,7 @@ if (!t.includes("radarLayerBRef")) {
     radarFrameRef.current = idx;
     setRadarFrame(idx);
   }, []);`;
-
-  if (t.includes(oldApply)) {
-    t = t.replace(oldApply, newApply);
-    console.log("restore-stormmap: premium radar crossfade applied");
-  } else {
-    console.warn("restore-stormmap: applyRadarFrame block not matched for premium patch");
-  }
+  if (t.includes(oldRadar)) t = t.replace(oldRadar, newRadar);
 
   t = t.replace(
     "radarTimerRef.current = window.setInterval(() => {\n      const next = (radarFrameRef.current + 1) % RADAR_FRAMES.length;\n      applyRadarFrame(next);\n    }, 750);",
@@ -263,7 +270,94 @@ if (!t.includes("radarLayerBRef")) {
     };
     radarTimerRef.current = window.setTimeout(tick, radarSpeedRef.current);`
   );
+
+  const oldHrrr = `const applyHrrrFrame = useCallback((idx: number) => {
+    const frames = hrrrFramesRef.current;
+    const map = mapInstance.current;
+    const bounds = hrrrBoundsRef.current;
+    if (!map || !bounds || !frames.length) return;
+    const f = frames[Math.max(0, Math.min(idx, frames.length - 1))];
+    if (!f?.url) return;
+    hrrrFrameRef.current = idx;
+    setHrrrFrameIdx(idx);
+    if (hrrrReflLayerRef.current) {
+      map.removeLayer(hrrrReflLayerRef.current);
+      hrrrReflLayerRef.current = null;
+    }
+    const layer = L.imageOverlay(f.url, bounds, {
+      opacity: 0.7,
+      zIndex: 250,
+      interactive: false,
+    });
+    layer.addTo(map);
+    hrrrReflLayerRef.current = layer;
+  }, []);`;
+  const newHrrr = `const applyHrrrFrame = useCallback((idx: number) => {
+    const frames = hrrrFramesRef.current;
+    const map = mapInstance.current;
+    const bounds = hrrrBoundsRef.current;
+    if (!map || !bounds || !frames.length) return;
+    const f = frames[Math.max(0, Math.min(idx, frames.length - 1))];
+    if (!f?.url) return;
+    hrrrFrameRef.current = idx;
+    setHrrrFrameIdx(idx);
+    const isA = hrrrActiveRef.current === "A";
+    let inL = isA ? hrrrLayerBRef.current : hrrrReflLayerRef.current;
+    const outL = isA ? hrrrReflLayerRef.current : hrrrLayerBRef.current;
+    if (!inL) {
+      inL = L.imageOverlay(f.url, bounds, { opacity: 0, zIndex: 250, interactive: false });
+      inL.addTo(map);
+      if (isA) hrrrLayerBRef.current = inL;
+      else hrrrReflLayerRef.current = inL;
+    } else {
+      inL.setUrl(f.url);
+      inL.setOpacity(0);
+      if (!map.hasLayer(inL)) inL.addTo(map);
+    }
+    let step = 0;
+    const steps = 12;
+    const fade = () => {
+      step++;
+      const tt = step / steps;
+      inL!.setOpacity(0.7 * tt);
+      if (outL) outL.setOpacity(0.7 * (1 - tt));
+      if (step < steps) requestAnimationFrame(fade);
+      else {
+        if (outL) outL.setOpacity(0);
+        hrrrActiveRef.current = isA ? "B" : "A";
+      }
+    };
+    requestAnimationFrame(fade);
+  }, []);`;
+  if (t.includes(oldHrrr)) t = t.replace(oldHrrr, newHrrr);
+
+  t = t.replace(
+    "hrrrTimerRef.current = window.setInterval(() => {\n      const next = (hrrrFrameRef.current + 1) % hrrrFramesRef.current.length;\n      applyHrrrFrame(next);\n    }, 900);",
+    `const hTick = () => {
+      if (!hrrrPlayingRef.current) return;
+      const next = (hrrrFrameRef.current + 1) % hrrrFramesRef.current.length;
+      applyHrrrFrame(next);
+      hrrrTimerRef.current = window.setTimeout(hTick, radarSpeedRef.current + 120);
+    };
+    hrrrTimerRef.current = window.setTimeout(hTick, radarSpeedRef.current + 120);`
+  );
+
+  const speedUi = `{radarPlaying && (
+              <span style={{ display: "inline-flex", gap: 4 }}>
+                {[{l:"SLOW",m:1100},{l:"NORM",m:650},{l:"FAST",m:320}].map(s => (
+                  <button key={s.l} type="button" onClick={() => setRadarSpeed(s.m)}
+                    style={{...btnStyle(radarSpeed===s.m), padding:"4px 8px", fontSize:10}}>
+                    {s.l}
+                  </button>
+                ))}
+              </span>
+            )}`;
+  t = t.replace(
+    /(<button type="button" onClick=\{toggleRadarPlay\} style=\{btnStyle\(radarPlaying\)\} disabled=\{!radarOn\}>[\s\S]*?<\/button>)/,
+    "$1\n            " + speedUi,
+    1
+  );
 }
 
 fs.writeFileSync(out, t);
-console.log("restore-stormmap: premium animation patch applied, wrote", out, "(" + t.length + " bytes)");
+console.log("restore-stormmap: premium + speed + HRRR crossfade applied, wrote", out, "(" + t.length + " bytes)");
