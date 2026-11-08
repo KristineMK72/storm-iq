@@ -138,7 +138,6 @@ if (!t.includes("<SkewTPanel")) {
 
 // ---- Readable SPC Day 1 popups with official link ----
 if (!t.includes("Open official SPC Day 1")) {
-  // Categorical outlook: inject popup HTML with dark text + link
   const catOld = `L.geoJSON(f, {
                 style: { color, weight: 2, fillColor: color, fillOpacity: label === "TSTM" ? 0.08 : 0.22 },
               }).addTo(tornLayerRef.current!);`;
@@ -159,7 +158,6 @@ if (!t.includes("Open official SPC Day 1")) {
     console.warn("restore-stormmap: categorical SPC block not found for popup patch");
   }
 
-  // Hail outlook: add popup with link
   const hailOld = `L.geoJSON(f, {
                 style: { color: "#c084fc", weight: 1.5, fillColor: "#c084fc", fillOpacity: 0.2, dashArray: "4 3" },
               }).addTo(hailLayerRef.current!);`;
@@ -181,5 +179,91 @@ if (!t.includes("Open official SPC Day 1")) {
   }
 }
 
+// ---- Premium animation: radar dual-layer crossfade ----
+if (!t.includes("radarLayerBRef")) {
+  t = t.replace(
+    "const radarLayerRef = useRef<L.TileLayer | null>(null);",
+    "const radarLayerRef = useRef<L.TileLayer | null>(null);\n  const radarLayerBRef = useRef<L.TileLayer | null>(null);\n  const radarActiveRef = useRef<\"A\" | \"B\">(\"A\");\n  const radarSpeedRef = useRef(650);"
+  );
+
+  t = t.replace(
+    /const radar = L\.tileLayer\(radarUrl\(RADAR_FRAMES\[RADAR_FRAMES\.length - 1\]\), \{[\s\S]*?\}\)\.addTo\(map\);\s*radarLayerRef\.current = radar;/,
+    `const radar = L.tileLayer(radarUrl(RADAR_FRAMES[RADAR_FRAMES.length - 1]), {
+      attribution: "Radar Iowa State Mesonet",
+      opacity: 0.85,
+      zIndex: 200,
+    }).addTo(map);
+    radarLayerRef.current = radar;
+    const radarB = L.tileLayer(radarUrl(RADAR_FRAMES[RADAR_FRAMES.length - 1]), {
+      attribution: "Radar Iowa State Mesonet",
+      opacity: 0,
+      zIndex: 201,
+    }).addTo(map);
+    radarLayerBRef.current = radarB;`
+  );
+
+  const oldApply = `const applyRadarFrame = useCallback((idx: number) => {
+    const layer = radarLayerRef.current;
+    if (!layer) return;
+    const frame = RADAR_FRAMES[idx] ?? "";
+    layer.setUrl(radarUrl(frame));
+    radarFrameRef.current = idx;
+    setRadarFrame(idx);
+  }, []);`;
+
+  const newApply = `const applyRadarFrame = useCallback((idx: number) => {
+    const map = mapInstance.current;
+    if (!map) return;
+    const frame = RADAR_FRAMES[idx] ?? "";
+    const url = radarUrl(frame);
+    const isA = radarActiveRef.current === "A";
+    const outL = isA ? radarLayerRef.current : radarLayerBRef.current;
+    const inL = isA ? radarLayerBRef.current : radarLayerRef.current;
+    if (!inL || !outL) {
+      if (radarLayerRef.current) radarLayerRef.current.setUrl(url);
+      radarFrameRef.current = idx;
+      setRadarFrame(idx);
+      return;
+    }
+    inL.setUrl(url);
+    inL.setOpacity(0);
+    if (!map.hasLayer(inL)) inL.addTo(map);
+    let step = 0;
+    const steps = 10;
+    const fade = () => {
+      step++;
+      const tt = step / steps;
+      inL.setOpacity(0.85 * tt);
+      outL.setOpacity(0.85 * (1 - tt));
+      if (step < steps) requestAnimationFrame(fade);
+      else {
+        outL.setOpacity(0);
+        radarActiveRef.current = isA ? "B" : "A";
+      }
+    };
+    requestAnimationFrame(fade);
+    radarFrameRef.current = idx;
+    setRadarFrame(idx);
+  }, []);`;
+
+  if (t.includes(oldApply)) {
+    t = t.replace(oldApply, newApply);
+    console.log("restore-stormmap: premium radar crossfade applied");
+  } else {
+    console.warn("restore-stormmap: applyRadarFrame block not matched for premium patch");
+  }
+
+  t = t.replace(
+    "radarTimerRef.current = window.setInterval(() => {\n      const next = (radarFrameRef.current + 1) % RADAR_FRAMES.length;\n      applyRadarFrame(next);\n    }, 750);",
+    `const tick = () => {
+      if (!radarPlayingRef.current) return;
+      const next = (radarFrameRef.current + 1) % RADAR_FRAMES.length;
+      applyRadarFrame(next);
+      radarTimerRef.current = window.setTimeout(tick, radarSpeedRef.current);
+    };
+    radarTimerRef.current = window.setTimeout(tick, radarSpeedRef.current);`
+  );
+}
+
 fs.writeFileSync(out, t);
-console.log("restore-stormmap: sounding + SPC popups wired, wrote", out, "(" + t.length + " bytes)");
+console.log("restore-stormmap: premium animation patch applied, wrote", out, "(" + t.length + " bytes)");
